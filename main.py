@@ -57,7 +57,7 @@ with app.app_context() as ctx:
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
 
-redis_host = os.getenv('REDIS_HOST', 'localhost')
+redis_host = os.getenv('REDISHOST', 'localhost')
 redis_port = int(os.getenv('REDIS_PORT', 6379))
 redis_password = os.getenv('REDIS_PASSWORD', None)
 
