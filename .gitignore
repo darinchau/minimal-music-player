@@ -132,3 +132,6 @@ dmypy.json
 cython_debug/
 
 *.wav
+*.mp3
+.vscode
+test.ipynb

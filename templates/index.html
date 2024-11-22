@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Stream Audio</title>
+</head>
+<body>
+<h1>Audio Stream Player</h1>
+<!-- Audio element where the stream will be played -->
+<audio controls>
+    <source src="http://localhost:8123/play/12345678901" type="audio/wav">
+    Your browser does not support the audio element.
+</audio>
+
+<script>
+    // JavaScript to interact with the audio element if needed
+    var audio = document.querySelector('audio');
+
+    // Add event listeners as required, for example:
+    audio.addEventListener('error', function(event) {
+        alert('Error fetching or playing audio.');
+    });
+</script>
+</body>
+</html>

@@ -1,3 +1,4 @@
+from __future__ import annotations
 import os
 import sys
 from flask import Flask, Response, stream_with_context, render_template
@@ -8,33 +9,49 @@ from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 import os
 from werkzeug.utils import secure_filename
+from sqlalchemy import Integer, String, DateTime, Text, ForeignKey, Float, Boolean
+from sqlalchemy import ForeignKey
+from sqlalchemy import Integer
+from sqlalchemy.orm import Mapped
+from sqlalchemy.orm import mapped_column
+from sqlalchemy.orm import relationship
+import typing
+from typing import Any
+import enum
 
+# Chunk size for audio processing
+CHUNK = 1024
+
+#### Setup db ####
+db = SQLAlchemy()
+
+class AudioFile(db.Model):
+    __tablename__ = 'audio_files'
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    title: Mapped[str] = mapped_column(Text)
+    filename: Mapped[str] = mapped_column(Text)
+    url_id: Mapped[str] = mapped_column(Text)
+    format: Mapped[str] = mapped_column(Text)
+    active: Mapped[bool] = mapped_column(Boolean)
+
+    ACCEPTED_FORMATS = ["wav", "mp3"]
+
+    def __repr__(self) -> str:
+        return f'<AudioFile {self.title} {self.filename}>'
+
+#### App ####
 app = Flask(__name__)
 CORS(app)
 
-app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://username:password@localhost/audiodb'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_DATABASE_URI'] = "sqlite:///database.db"
 app.config['UPLOAD_FOLDER'] = 'uploads/'
-db = SQLAlchemy(app)
 
-CHUNK = 1024
+db.init_app(app)
+with app.app_context() as ctx:
+    db.create_all()
 
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
-
-class AudioFile(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(100), nullable=False)
-    filename = db.Column(db.String(100), nullable=False)
-    url_id = db.Column(db.String(11), nullable=False)
-    active = db.Column(db.Boolean, default=True)
-
-    def __repr__(self):
-        return f'<AudioFile {self.title}>'
-
-with app.app_context():
-    db.create_all()
 
 # Routes
 @app.route('/')
@@ -45,16 +62,22 @@ def index():
 def upload_file():
     file = request.files['audio']
     url_id = request.form['url_id']
+    format = request.form['format']
     if len(url_id) != 11:
         return jsonify({"error": "Invalid URL ID"}), 400
 
-    if file and file.filename.endswith('.wav'):
+    if format not in AudioFile.ACCEPTED_FORMATS:
+        return jsonify({"error": f"Invalid format: {format}"}), 400
+
+    if file and file.filename is not None and file.filename.endswith('.wav'):
         filename = secure_filename(file.filename)
         file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
         audio_file = AudioFile(
             title=request.form['title'],
             filename=filename,
-            url_id=url_id
+            url_id=url_id,
+            format=format,
+            active=True,
         )
         db.session.add(audio_file)
         db.session.commit()
@@ -62,48 +85,34 @@ def upload_file():
 
     return jsonify({"error": "Invalid file"}), 400
 
-@app.route('/play', methods=['GET'])
-def play_audio():
-    def sound(path: str):
-        wf = wave.open(path, 'rb')
-
-        p = pyaudio.PyAudio()
-
-        stream = p.open(format =
-                        p.get_format_from_width(wf.getsampwidth()),
-                        channels = wf.getnchannels(),
-                        rate = wf.getframerate(),
-                        output = True)
-
-        data = wf.readframes(CHUNK)
-
-        while data:
-            stream.write(data)
+@app.route('/play/<url_id>', methods=['GET'])
+def play_audio(url_id):
+    def sound_wav(path):
+        try:
+            wf = wave.open(os.path.join(app.config["UPLOAD_FOLDER"], path), 'rb')
             data = wf.readframes(CHUNK)
 
-        # cleanup stuff.
-        wf.close()
-        stream.close()
-        p.terminate()
+            while data:
+                yield data
+                data = wf.readframes(CHUNK)
 
-    path = None
-    if 'id' in request.args:
-        audio_file = AudioFile.query.get(request.args['id'])
-        if audio_file:
-            path = os.path.join(app.config['UPLOAD_FOLDER'], audio_file.filename)
-    elif 'url_id' in request.args:
-        audio_file = AudioFile.query.filter_by(url_id=request.args['url_id']).first()
-        if audio_file:
-            path = os.path.join(app.config['UPLOAD_FOLDER'], audio_file.filename)
-    elif 'title' in request.args:
-        audio_file = AudioFile.query.filter_by(title=request.args['title']).first()
-        if audio_file:
-            path = os.path.join(app.config['UPLOAD_FOLDER'], audio_file.filename)
+            wf.close()
+        except wave.Error as e:
+            return jsonify({"error": str(e)}), 500
 
-    if not path:
+    audio = AudioFile.query.filter_by(url_id=url_id).first()
+
+    if not audio:
         return jsonify({"error": "File not found"}), 404
 
-    return Response(sound(), mimetype="audio/wav")
+    path = audio.filename
+
+    if audio.format == "wav":
+        return Response(sound_wav(path), mimetype="audio/wav")
+    elif audio.format in AudioFile.ACCEPTED_FORMATS:
+        return jsonify({"error": f"File format not supported yet: {audio.format}"}), 500
+    else:
+        return jsonify({"error": f"File format not recognized: {audio.format}"}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, port=8123)
