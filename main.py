@@ -46,7 +46,7 @@ class AudioFile(db.Model):
 app = Flask(__name__)
 CORS(app)
 
-app.config['SQLALCHEMY_DATABASE_URI'] = "sqlite:///database.db"
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
 app.config['UPLOAD_FOLDER'] = 'uploads/'
 app.secret_key = os.getenv('SECRET_KEY')
 
@@ -57,7 +57,11 @@ with app.app_context() as ctx:
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
 
-r = redis.Redis(host='localhost', port=6379, db=0)
+redis_host = os.getenv('REDIS_HOST', 'localhost')
+redis_port = int(os.getenv('REDIS_PORT', 6379))
+redis_password = os.getenv('REDIS_PASSWORD', None)
+
+r = redis.Redis(host=redis_host, port=redis_port, password=redis_password, decode_responses=True)
 
 # Routes
 @app.route('/')
