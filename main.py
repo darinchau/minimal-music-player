@@ -99,25 +99,6 @@ def upload_file():
 
     return jsonify({"error": "Invalid file"}), 400
 
-@app.route('/<format>/<url_id>', methods=['GET'])
-def play_sound(format, url_id):
-    def stream(path):
-        try:
-            with open(path, "rb") as fwav:
-                data = fwav.read(CHUNK)
-                while data:
-                    yield data
-                    data = fwav.read(CHUNK)
-        except Exception as e:
-            return jsonify({"error": str(e)}), 500
-
-    audio = AudioFile.query.filter_by(url_id=url_id).filter_by(active=True).filter_by(format=format).first()
-    if not audio:
-        return jsonify({"error": "File not found"}), 404
-
-    path = audio.filename
-    return Response(stream(path), mimetype=AudioFile.ACCEPTED_FORMATS[format])
-
 @app.route('/play', methods=['GET'])
 def play_random():
     format = "ogg"
@@ -130,7 +111,7 @@ def play_random():
             path, id = random.choice(paths)
             r.set(f"audio_{user_id}", id)
             try:
-                with open(path, "rb") as fwav:
+                with open(os.path.join(app.config['UPLOAD_FOLDER'], path), "rb") as fwav:
                     data = fwav.read(CHUNK)
                     while data:
                         yield data
