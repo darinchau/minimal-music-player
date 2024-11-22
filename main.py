@@ -49,7 +49,7 @@ app = Flask(__name__)
 CORS(app)
 
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
-app.config['UPLOAD_FOLDER'] = 'uploads/'
+app.config['UPLOAD_FOLDER'] = '/uploads/'
 app.secret_key = os.getenv('SECRET_KEY')
 
 db.init_app(app)
