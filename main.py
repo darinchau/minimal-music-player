@@ -15,6 +15,8 @@ from sqlalchemy.orm import relationship
 import redis
 import random
 import uuid
+import traceback
+
 import dotenv
 dotenv.load_dotenv()
 
@@ -134,7 +136,10 @@ def play_random():
                         yield data
                         data = fwav.read(CHUNK)
             except Exception as e:
-                return jsonify({"error": str(e)}), 500
+                print(e)
+                print(traceback.format_exc())
+                yield jsonify({"error": str(e)}), 500
+                return
 
     audios = AudioFile.query.filter_by(active=True, format=format).all()
     if not audios:
