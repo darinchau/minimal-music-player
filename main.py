@@ -89,14 +89,11 @@ def upload_file():
 def play_audio(url_id):
     def sound_wav(path):
         try:
-            wf = wave.open(os.path.join(app.config["UPLOAD_FOLDER"], path), 'rb')
-            data = wf.readframes(CHUNK)
-
-            while data:
-                yield data
-                data = wf.readframes(CHUNK)
-
-            wf.close()
+            with open(path, "rb") as fwav:
+                data = fwav.read(CHUNK)
+                while data:
+                    yield data
+                    data = fwav.read(CHUNK)
         except wave.Error as e:
             return jsonify({"error": str(e)}), 500
 
@@ -108,7 +105,7 @@ def play_audio(url_id):
     path = audio.filename
 
     if audio.format == "wav":
-        return Response(sound_wav(path), mimetype="audio/wav")
+        return Response(sound_wav(path), mimetype="audio/x-wav")
     elif audio.format in AudioFile.ACCEPTED_FORMATS:
         return jsonify({"error": f"File format not supported yet: {audio.format}"}), 500
     else:

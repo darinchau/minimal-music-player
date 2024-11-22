@@ -1,25 +1,39 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Stream Audio</title>
-</head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Minimal Music Player</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin-top: 50px;
+    }
+    audio {
+      width: 100%;
+      max-width: 600px;
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.js"></script>
+  <script>
+  function PlayMusic() {
+
+    var play=document.getElementById("music");
+    play.play();
+  }
+
+  $(document).ready(function(){
+    setTimeout(PlayMusic,3000);
+  })
+
+  </script>
+  </head>
 <body>
-<h1>Audio Stream Player</h1>
-<!-- Audio element where the stream will be played -->
-<audio controls>
-    <source src="http://localhost:8123/play/12345678901" type="audio/wav">
+  <h1>Minimal Music Player</h1>
+  <audio controls>
+    <source src="/play/12345678901" type="audio/x-wav;codec=pcm">
     Your browser does not support the audio element.
-</audio>
-
-<script>
-    // JavaScript to interact with the audio element if needed
-    var audio = document.querySelector('audio');
-
-    // Add event listeners as required, for example:
-    audio.addEventListener('error', function(event) {
-        alert('Error fetching or playing audio.');
-    });
-</script>
+  </audio>
 </body>
 </html>
