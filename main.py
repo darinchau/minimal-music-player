@@ -14,6 +14,7 @@ from sqlalchemy.orm import mapped_column
 from sqlalchemy.orm import relationship
 import redis
 import random
+import time
 import uuid
 import traceback
 
@@ -110,6 +111,7 @@ def play_random():
         while True:
             path, id = random.choice(paths)
             r.set(f"audio_{user_id}", id)
+            print(f"User: {user_id} is playing {id}")
             try:
                 with open(os.path.join(app.config['UPLOAD_FOLDER'], path), "rb") as fwav:
                     data = fwav.read(CHUNK)
@@ -119,8 +121,8 @@ def play_random():
             except Exception as e:
                 print(e)
                 print(traceback.format_exc())
-                yield jsonify({"error": str(e)}), 500
-                return
+                time.sleep(1)
+                continue
 
     audios = AudioFile.query.filter_by(active=True, format=format).all()
     if not audios:

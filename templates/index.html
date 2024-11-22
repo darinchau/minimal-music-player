@@ -29,8 +29,8 @@
 
     function updateMetadata() {
       $.getJSON('/metadata', function(data) {
-        if (data.title && data.artist) {
-          $('#metadata').text(`Now Playing: ${data.title} by ${data.artist}`);
+        if (data.title && data.url) {
+          $('#metadata').text(`Now Playing: ${data.title} (${data.url})`);
         } else {
           $('#metadata').text("Currently, no track information is available.");
         }
