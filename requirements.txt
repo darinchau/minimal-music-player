@@ -2,7 +2,6 @@ flask
 flask-cors
 flask-sqlalchemy
 psycopg2-binary
-pyaudio
 python-dotenv
 redis
 requests
