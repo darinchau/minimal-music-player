@@ -1,6 +1,7 @@
 flask
 flask-cors
 flask-sqlalchemy
+gunicorn==21.2.0
 psycopg2-binary
 python-dotenv
 redis
