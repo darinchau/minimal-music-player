@@ -6,3 +6,4 @@ pyaudio
 python-dotenv
 redis
 requests
+uuid

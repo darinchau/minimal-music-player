@@ -5,7 +5,6 @@ from flask import Flask, Response, stream_with_context, render_template
 from flask_cors import CORS
 from flask import Flask, request, jsonify, session
 from flask_sqlalchemy import SQLAlchemy
-import os
 from werkzeug.utils import secure_filename
 from sqlalchemy import Integer, String, DateTime, Text, ForeignKey, Float, Boolean
 from sqlalchemy import ForeignKey
@@ -15,6 +14,7 @@ from sqlalchemy.orm import mapped_column
 from sqlalchemy.orm import relationship
 import redis
 import random
+import uuid
 import dotenv
 dotenv.load_dotenv()
 
@@ -57,9 +57,13 @@ with app.app_context() as ctx:
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
 
+r = redis.Redis(host='localhost', port=6379, db=0)
+
 # Routes
 @app.route('/')
 def index():
+    if 'user_id' not in session:
+        session['user_id'] = str(uuid.uuid4())  # Generate a unique user_id
     return render_template('index.html')
 
 @app.route('/upload', methods=['POST'])
@@ -111,14 +115,14 @@ def play_sound(format, url_id):
 @app.route('/play', methods=['GET'])
 def play_random():
     format = "ogg"
-    session['current_audio'] = None  # Reset current audio for this session
+    user_id = request.cookies.get('user_id')
 
     def stream(paths):
         print(paths)
 
         while True:
             path, id = random.choice(paths)
-            session['current_audio'] = id  # Store the current audio ID in the session
+            r.set(f"audio_{user_id}", id)
             try:
                 with open(path, "rb") as fwav:
                     data = fwav.read(CHUNK)
@@ -134,9 +138,10 @@ def play_random():
     paths = [(audio.filename, audio.id) for audio in audios]
     return Response(stream(paths), mimetype=AudioFile.ACCEPTED_FORMATS[format])
 
-@app.route('/metadata', methods=['GET'])
+@app.route('/metadata')
 def get_metadata():
-    audio_id = session.get('current_audio')
+    user_id = request.cookies.get('user_id')
+    audio_id = r.get(f"audio_{user_id}")
     if audio_id is None:
         return jsonify({"error": "No audio currently playing"}), 404
 
