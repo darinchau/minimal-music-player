@@ -14,26 +14,45 @@
       width: 100%;
       max-width: 600px;
     }
+    #metadata {
+      margin-top: 20px;
+    }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.js"></script>
   <script>
-  function PlayMusic() {
-
-    var play=document.getElementById("music");
-    play.play();
-  }
-
   $(document).ready(function(){
-    setTimeout(PlayMusic,3000);
-  })
+    const audioPlayer = $('audio')[0];  // Using jQuery to reference the audio player
 
+    function playMusic() {
+      audioPlayer.play();
+    }
+
+    function updateMetadata() {
+      $.getJSON('/metadata', function(data) {
+        if (data.title && data.artist) {
+          $('#metadata').text(`Now Playing: ${data.title} by ${data.artist}`);
+        } else {
+          $('#metadata').text("Currently, no track information is available.");
+        }
+      }).fail(function() {
+        $('#metadata').text("Error: Could not fetch track information.");
+      });
+    }
+
+    // Delay playing music slightly to ensure it loads
+    setTimeout(playMusic, 3000);
+
+    // Update metadata every 10 seconds
+    setInterval(updateMetadata, 10000);
+  });
   </script>
-  </head>
+</head>
 <body>
   <h1>Minimal Music Player</h1>
   <audio controls>
-    <source src="/play/12345678901" type="audio/x-wav;codec=pcm">
+    <source src="/play" type="audio/ogg">
     Your browser does not support the audio element.
   </audio>
+  <div id="metadata">Loading track information...</div>
 </body>
 </html>
