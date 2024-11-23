@@ -30,7 +30,8 @@
     function updateMetadata() {
       $.getJSON('/metadata', function(data) {
         if (data.title && data.url) {
-          $('#metadata').text(`Now Playing: ${data.title} (${data.url})`);
+          // Create a clickable link for the title that points to the URL
+          $('#metadata').html(`Now Playing: <a href="${data.url}" target="_blank">${data.title}</a>`);
         } else {
           $('#metadata').text("Currently, no track information is available.");
         }
