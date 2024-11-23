@@ -85,6 +85,10 @@ def upload_file():
     if format not in AudioFile.ACCEPTED_FORMATS:
         return jsonify({"error": f"Invalid format: {format}"}), 400
 
+    secret = request.form['secret']
+    if secret != os.getenv('ADMIN_SECRET'):
+        return jsonify({"error": "Invalid secret"}), 401
+
     exist_url_id = AudioFile.query.filter_by(url_id=url_id).first()
     if exist_url_id:
         return jsonify({"error": f"URL ID {url_id} already exists"}), 400
@@ -110,6 +114,9 @@ def upload_file():
 @app.route('/remove', methods=['DELETE'])
 def remove_file():
     audio_id = request.form['id']
+    secret = request.form['secret']
+    if secret != os.getenv('ADMIN_SECRET'):
+        return jsonify({"error": "Invalid secret"}), 401
     audio = AudioFile.query.get(audio_id)
     if audio:
         # Remove file from disk
