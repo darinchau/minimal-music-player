@@ -17,6 +17,7 @@ import random
 import time
 import uuid
 import traceback
+import threading
 
 import dotenv
 dotenv.load_dotenv()
@@ -84,9 +85,16 @@ def upload_file():
     if format not in AudioFile.ACCEPTED_FORMATS:
         return jsonify({"error": f"Invalid format: {format}"}), 400
 
+    exist_url_id = AudioFile.query.filter_by(url_id=url_id).first()
+    if exist_url_id:
+        return jsonify({"error": f"URL ID {url_id} already exists"}), 400
+
     if file and file.filename is not None:
-        filename = secure_filename(file.filename)
-        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        file_ext = os.path.splitext(file.filename)[1]
+        filename = secure_filename(f"{url_id}{file_ext}")
+        t = threading.Thread(target=upload, args=(file, filename))
+        t.start()
+
         audio_file = AudioFile(
             title=request.form['title'],
             filename=filename,
@@ -99,6 +107,23 @@ def upload_file():
         return jsonify({"message": "File uploaded successfully", "id": audio_file.id})
 
     return jsonify({"error": "Invalid file"}), 400
+
+def upload(file, filename):
+    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+
+@app.route('/remove', methods=['DELETE'])
+def remove_file():
+    audio_id = request.form['id']
+    audio = AudioFile.query.get(audio_id)
+    if audio:
+        # Remove file from disk
+        os.remove(os.path.join(app.config['UPLOAD_FOLDER'], audio.filename))
+        # Remove from db
+        db.session.delete(audio)
+        db.session.commit()
+        return jsonify({"message": "File removed successfully"})
+    return jsonify({"error": "File not found"}), 404
+
 
 @app.route('/play', methods=['GET'])
 def play_random():
