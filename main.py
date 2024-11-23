@@ -127,6 +127,25 @@ def remove_file():
         return jsonify({"message": "File removed successfully"})
     return jsonify({"error": "File not found"}), 404
 
+@app.route('/toggle', methods=['POST'])
+def toggle_file():
+    audio_id = request.form['id']
+    secret = request.form['secret']
+    mode = request.form['mode']
+    if secret != os.getenv('ADMIN_SECRET'):
+        return jsonify({"error": "Invalid secret"}), 401
+    audio = AudioFile.query.get(audio_id)
+    if audio:
+        if mode == 'activate':
+            audio.active = True
+        elif mode == 'deactivate':
+            audio.active = False
+        else:
+            return jsonify({"error": f"Invalid mode: {mode}"}), 400
+        db.session.commit()
+        return jsonify({"message": f"File {mode}d successfully"})
+    return jsonify({"error": "File not found"}), 404
+
 
 @app.route('/play', methods=['GET'])
 def play_random():

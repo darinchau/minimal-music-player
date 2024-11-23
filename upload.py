@@ -1,17 +1,32 @@
 import requests
+import random
+import json
+import os
+import dotenv
 
+dotenv.load_dotenv()
 # Upload "test.wav"
 
 def upload_file(url, file_path, url_id, format, title):
     """ Upload a file to a specified URL using POST with multipart/form-data. """
+
+    # Open the file in binary mode
     with open(file_path, 'rb') as file:
+        # Define the files to be sent in the POST request
         files = {'audio': (file_path, file, 'audio/wav')}
+
+        # Define the data to be sent in the POST request
         data = {
             'url_id': url_id,
             'format': format,
-            'title': title
+            'title': title,
+            'secret': os.getenv("ADMIN_SECRET")
         }
-        response = requests.post(url, files=files, data=data)
+
+        # Send POST request
+        response = requests.post(url, files=files, data=data, timeout=None, verify=False)
+
+        # Return response from server
         return response
 
 if __name__ == '__main__':
