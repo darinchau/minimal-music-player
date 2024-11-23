@@ -153,8 +153,7 @@ def play_random():
     user_id = request.cookies.get('user_id')
 
     def stream(paths):
-        print(paths)
-
+        check_skip = 100
         while True:
             path, id = random.choice(paths)
             r.set(f"audio_{user_id}", id)
@@ -165,6 +164,12 @@ def play_random():
                     while data:
                         yield data
                         data = fwav.read(CHUNK)
+                        check_skip -= 1
+                        if check_skip <= 0:
+                            check_skip = 100
+                            if r.get(f"audio_{user_id}") is None:
+                                print(f"User: {user_id} stopped playing {id}")
+                                break
             except Exception as e:
                 print(e)
                 print(traceback.format_exc())
@@ -189,6 +194,20 @@ def get_metadata():
         return jsonify({"title": audio.title, "url": f"https://www.youtube.com/watch?v={audio.url_id}"})
     else:
         return jsonify({"error": "Audio metadata not found"}), 404
+
+@app.route('/skip', methods=['POST'])
+def skip():
+    user_id = request.cookies.get('user_id')
+    audio_id = r.get(f"audio_{user_id}")
+    if audio_id is None:
+        return jsonify({"error": "No audio currently playing"}), 404
+
+    audio = AudioFile.query.get(audio_id)
+    if audio:
+        r.delete(f"audio_{user_id}")
+        return jsonify({"message": "Audio skipped"})
+    else:
+        return jsonify({"error": "Audio not found"}), 404
 
 if __name__ == '__main__':
     app.run(debug=True, port=8123)

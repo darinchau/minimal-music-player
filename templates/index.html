@@ -14,7 +14,7 @@
       width: 100%;
       max-width: 600px;
     }
-    #metadata {
+    #metadata, #skip-button {
       margin-top: 20px;
     }
   </style>
@@ -40,6 +40,17 @@
       });
     }
 
+    $('#skip-button').click(function() {
+      $.post('/skip', function() {
+        updateMetadata();
+        audioPlayer.pause();
+        audioPlayer.load(); // Reload the <audio> element to play the new track
+        playMusic();
+      }).fail(function() {
+        alert('Error: Could not skip track.');
+      });
+    });
+
     // Delay playing music slightly to ensure it loads
     setTimeout(playMusic, 3000);
 
@@ -55,5 +66,6 @@
     Your browser does not support the audio element.
   </audio>
   <div id="metadata">Loading track information...</div>
+  <button id="skip-button">Skip song</button>
 </body>
 </html>
