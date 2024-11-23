@@ -92,9 +92,8 @@ def upload_file():
     if file and file.filename is not None:
         file_ext = os.path.splitext(file.filename)[1]
         filename = secure_filename(f"{url_id}{file_ext}")
-        t = threading.Thread(target=upload, args=(file, filename))
-        t.start()
-
+        print(f"Saving file: {file.filename} to {filename}")
+        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
         audio_file = AudioFile(
             title=request.form['title'],
             filename=filename,
@@ -107,9 +106,6 @@ def upload_file():
         return jsonify({"message": "File uploaded successfully", "id": audio_file.id})
 
     return jsonify({"error": "Invalid file"}), 400
-
-def upload(file, filename):
-    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 
 @app.route('/remove', methods=['DELETE'])
 def remove_file():
