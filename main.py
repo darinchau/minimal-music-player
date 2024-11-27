@@ -67,6 +67,9 @@ redis_password = os.getenv('REDIS_PASSWORD', None)
 
 r = redis.Redis(host=redis_host, port=redis_port, password=redis_password, decode_responses=True)
 
+def get_metadata_content(title, url_id):
+    return f"Now Playing: <a href=\"https://www.youtube.com/watch?v={url_id}\" target=\"_blank\">{title}</a>"
+
 # Routes
 @app.route('/')
 def index():
@@ -82,8 +85,8 @@ def play_random():
     def stream(paths):
         check_skip = 100
         while True:
-            path, id = random.choice(paths)
-            r.set(f"audio_{user_id}", id)
+            path, id, title = random.choice(paths)
+            r.set(f"audio_{user_id}", get_metadata_content(title, id))
             print(f"User: {user_id} is playing {id}")
             try:
                 with open(os.path.join(app.config['UPLOAD_FOLDER'], path), "rb") as fwav:
@@ -106,7 +109,7 @@ def play_random():
     audios = AudioFile.query.filter_by(active=True, format=format).all()
     if not audios:
         return jsonify({"error": "File not found"}), 404
-    paths = [(audio.filename, audio.id) for audio in audios]
+    paths = [(audio.filename, audio.id, audio.title) for audio in audios]
     return Response(stream(paths), mimetype=AudioFile.ACCEPTED_FORMATS[format])
 
 @app.route('/metadata')
@@ -116,11 +119,7 @@ def get_metadata():
     if audio_id is None:
         return jsonify({"error": "No audio currently playing"}), 404
 
-    audio = AudioFile.query.get(audio_id)
-    if audio:
-        return jsonify({"title": audio.title, "url": f"https://www.youtube.com/watch?v={audio.url_id}"})
-    else:
-        return jsonify({"error": "Audio metadata not found"}), 404
+    return jsonify({"html": audio_id})
 
 @app.route('/skip', methods=['POST'])
 def skip():
