@@ -27,22 +27,8 @@
       audioPlayer.play();
     }
 
-    function updateMetadata() {
-      $.getJSON('/metadata', function(data) {
-        if (data.title && data.url) {
-          // Create a clickable link for the title that points to the URL
-          $('#metadata').html(`Now Playing: <a href="${data.url}" target="_blank">${data.title}</a>`);
-        } else {
-          $('#metadata').text("Currently, no track information is available.");
-        }
-      }).fail(function() {
-        $('#metadata').text("Error: Could not fetch track information.");
-      });
-    }
-
     $('#skip-button').click(function() {
       $.post('/skip', function() {
-        updateMetadata();
         audioPlayer.pause();
         audioPlayer.load(); // Reload the <audio> element to play the new track
         playMusic();
@@ -53,9 +39,6 @@
 
     // Delay playing music slightly to ensure it loads
     setTimeout(playMusic, 3000);
-
-    // Update metadata every 10 seconds
-    setInterval(updateMetadata, 10000);
   });
   </script>
 </head>
@@ -65,7 +48,6 @@
     <source src="/play" type="audio/ogg">
     Your browser does not support the audio element.
   </audio>
-  <div id="metadata">Loading track information...</div>
   <button id="skip-button">Skip song</button>
 </body>
 </html>

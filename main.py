@@ -129,12 +129,8 @@ def skip():
     if audio_id is None:
         return jsonify({"error": "No audio currently playing"}), 404
 
-    audio = AudioFile.query.get(audio_id)
-    if audio:
-        r.delete(f"audio_{user_id}")
-        return jsonify({"message": "Audio skipped"})
-    else:
-        return jsonify({"error": "Audio not found"}), 404
+    r.delete(f"audio_{user_id}")
+    return jsonify({"message": "Audio skipped"})
 
 if __name__ == '__main__':
     app.run(debug=True, port=8123)
