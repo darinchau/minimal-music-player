@@ -135,6 +135,6 @@ cython_debug/
 *.mp3
 *.ogg
 .vscode
-test.ipynb
+test*.ipynb
 uploads
 ogg
