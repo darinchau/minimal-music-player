@@ -79,6 +79,12 @@
     audioPlayer.addEventListener('play', function() {
       updateMetadata();
     }, { once: true });
+
+    // Add an event listener to update metadata when the audio ends
+    audioPlayer.addEventListener('ended', function() {
+      console.log('Track ended');
+      updateMetadata();
+    });
   });
   </script>
 </head>
