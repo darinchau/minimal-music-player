@@ -40,6 +40,7 @@
 
     function playMusic() {
       audioPlayer.play();
+      updateMetadata();
     }
 
     function updateMetadata() {
@@ -57,7 +58,6 @@
 
     function skipTrack() {
       $.post('/skip', function() {
-        updateMetadata();
         audioPlayer.pause();
         audioPlayer.load(); // Reload the <audio> element to play the new track
         playMusic();
