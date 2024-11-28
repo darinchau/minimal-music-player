@@ -40,7 +40,7 @@
       });
     }
 
-    $('#skip-button').click(function() {
+    function skipTrack() {
       $.post('/skip', function() {
         updateMetadata();
         audioPlayer.pause();
@@ -49,13 +49,24 @@
       }).fail(function() {
         alert('Error: Could not skip track.');
       });
+    }
+
+    $('#skip-button').click(function() {
+      skipTrack();
     });
 
     // Delay playing music slightly to ensure it loads
     setTimeout(playMusic, 3000);
 
-    // Update metadata every 10 seconds
-    setTimeout(updateMetadata, 10000);
+    // Add an event listener to update metadata once when the audio starts playing
+    audioPlayer.addEventListener('play', function() {
+      updateMetadata(); // Call updateMetadata when the audio starts playing
+    }, { once: true }); // Ensure the event handler is removed after it executes once
+
+    // Add an event listener to automatically skip to the next track when the current one ends
+    audioPlayer.addEventListener('ended', function() {
+      skipTrack(); // Call skipTrack when the audio ends
+    });
   });
   </script>
 </head>

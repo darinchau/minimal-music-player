@@ -25,6 +25,8 @@ dotenv.load_dotenv()
 # Chunk size for audio processing
 CHUNK = 1024
 
+CHECK_SKIP_INTERVAL = 100
+
 #### Setup db ####
 db = SQLAlchemy()
 
@@ -83,30 +85,37 @@ def play_random():
     user_id = session['user_id']
 
     def stream(paths):
-        check_skip = 100
+        check_skip = CHECK_SKIP_INTERVAL
         while True:
             path, id, title = random.choice(paths)
             r.set(f"audio_{user_id}", get_metadata_content(title, id))
             print(f"User: {user_id} is playing {id}")
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], path)
             try:
-                with open(os.path.join(app.config['UPLOAD_FOLDER'], path), "rb") as fwav:
+                with open(file_path, "rb") as fwav:
                     data = fwav.read(CHUNK)
                     while data:
                         yield data
                         data = fwav.read(CHUNK)
                         check_skip -= 1
                         if check_skip <= 0:
-                            check_skip = 100
+                            check_skip = CHECK_SKIP_INTERVAL
                             if r.get(f"audio_{user_id}") is None:
-                                print(f"User: {user_id} stopped playing {id}")
+                                print(f"User: {user_id} skipped playing {id}")
                                 break
             except Exception as e:
                 print(e)
                 print(traceback.format_exc())
                 time.sleep(1)
-                continue
+                continue # Loops back to the beginning of the while loop to play another song
 
             print(f"User: {user_id} stopped playing {id}")
+            while True:
+                metadata = r.get(f"audio_{user_id}")
+                # Play another audio if metadata is None or metadata is changed (the latter should not happen but just in case)
+                if metadata is None or metadata != get_metadata_content(title, id):
+                    break
+                time.sleep(0.5)
 
     audios = AudioFile.query.filter_by(active=True, format=format).all()
     if not audios:
