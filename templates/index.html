@@ -39,7 +39,12 @@
     const audioPlayer = $('audio')[0];  // Using jQuery to reference the audio player
 
     function playMusic() {
-      audioPlayer.play();
+      try {
+        audioPlayer.play();
+      } catch (error) {
+        console.error('Error playing audio:', error);
+        setTimeout(playMusic, 3000); // Retry playing music after a delay
+      }
       updateMetadata();
     }
 
@@ -54,7 +59,7 @@
       }).fail(function() {
         $('#metadata').text("Error: Could not fetch track information.");
         // Retry fetching metadata after a delay
-        setTimeout(updateMetadata, 5000);
+        setTimeout(updateMetadata, 3000);
       });
     }
 
