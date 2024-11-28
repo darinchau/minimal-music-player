@@ -27,6 +27,8 @@ CHUNK = 1024
 
 CHECK_SKIP_INTERVAL = 100
 
+SKIPPED = "-skipped"
+
 #### Setup db ####
 db = SQLAlchemy()
 
@@ -100,7 +102,7 @@ def play_random():
                         check_skip -= 1
                         if check_skip <= 0:
                             check_skip = CHECK_SKIP_INTERVAL
-                            if r.get(f"audio_{user_id}") is None:
+                            if r.get(f"audio_{user_id}") == SKIPPED:
                                 print(f"User: {user_id} skipped playing {id}")
                                 break
             except Exception as e:
@@ -115,6 +117,9 @@ def play_random():
                 # Play another audio if metadata is None or metadata is changed (the latter should not happen but just in case)
                 if metadata is None:
                     print(f"User: {user_id} stopped playing {id}")
+                    break
+                if metadata == SKIPPED:
+                    print(f"User: {user_id} skipped audio {id}")
                     break
                 if metadata != get_metadata_content(title, id):
                     print(f"User: {user_id} is playing another audio")
@@ -143,7 +148,7 @@ def skip():
     if audio_id is None:
         return jsonify({"error": "No audio currently playing"}), 404
     print(f"User: {user_id} skipped audio")
-    r.delete(f"audio_{user_id}")
+    r.set(f"audio_{user_id}", SKIPPED)
     return jsonify({"message": "Audio skipped"})
 
 if __name__ == '__main__':

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Minimal Music Player</title>
-  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -79,11 +79,6 @@
     audioPlayer.addEventListener('play', function() {
       updateMetadata();
     }, { once: true });
-
-    // Add an event listener to automatically skip to the next track when the current one ends
-    audioPlayer.addEventListener('ended', function() {
-      skipTrack();
-    });
   });
   </script>
 </head>
