@@ -53,6 +53,8 @@
         }
       }).fail(function() {
         $('#metadata').text("Error: Could not fetch track information.");
+        // Retry fetching metadata after a delay
+        setTimeout(updateMetadata, 5000);
       });
     }
 
