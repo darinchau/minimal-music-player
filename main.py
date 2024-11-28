@@ -109,11 +109,12 @@ def play_random():
                 time.sleep(1)
                 continue # Loops back to the beginning of the while loop to play another song
 
-            print(f"User: {user_id} stopped playing {id}")
+            print(f"User: {user_id} finished getting data for {id}")
             while True:
                 metadata = r.get(f"audio_{user_id}")
                 # Play another audio if metadata is None or metadata is changed (the latter should not happen but just in case)
                 if metadata is None or metadata != get_metadata_content(title, id):
+                    print(f"User: {user_id} stopped playing {id}")
                     break
                 time.sleep(0.5)
 
@@ -138,7 +139,7 @@ def skip():
     audio_id = r.get(f"audio_{user_id}")
     if audio_id is None:
         return jsonify({"error": "No audio currently playing"}), 404
-
+    print(f"User: {user_id} skipped audio")
     r.delete(f"audio_{user_id}")
     return jsonify({"message": "Audio skipped"})
 
