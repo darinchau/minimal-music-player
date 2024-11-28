@@ -106,6 +106,8 @@ def play_random():
                 time.sleep(1)
                 continue
 
+            print(f"User: {user_id} stopped playing {id}")
+
     audios = AudioFile.query.filter_by(active=True, format=format).all()
     if not audios:
         return jsonify({"error": "File not found"}), 404
