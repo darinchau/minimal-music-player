@@ -138,7 +138,8 @@ def get_metadata():
     audio_id = r.get(f"audio_{user_id}")
     if audio_id is None:
         return jsonify({"error": "No audio currently playing"}), 404
-
+    if audio_id == SKIPPED:
+        return jsonify({"error": "Audio skipped"}), 404
     return jsonify({"html": audio_id})
 
 @app.route('/skip', methods=['POST'])
