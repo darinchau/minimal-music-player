@@ -113,8 +113,11 @@ def play_random():
             while True:
                 metadata = r.get(f"audio_{user_id}")
                 # Play another audio if metadata is None or metadata is changed (the latter should not happen but just in case)
-                if metadata is None or metadata != get_metadata_content(title, id):
+                if metadata is None:
                     print(f"User: {user_id} stopped playing {id}")
+                    break
+                if metadata != get_metadata_content(title, id):
+                    print(f"User: {user_id} is playing another audio")
                     break
                 time.sleep(0.5)
 
