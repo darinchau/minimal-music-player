@@ -10,6 +10,8 @@
       font-family: Arial, sans-serif;
       text-align: center;
       margin-top: 50px;
+      background-color: #fff;
+      color: #000;
     }
     audio {
       width: 100%;
@@ -17,6 +19,14 @@
     }
     #metadata, #skip-button {
       margin-top: 20px;
+    }
+
+    /* Dark theme styles */
+    @media (prefers-color-scheme: dark) {
+      body {
+        background-color: #333;
+        color: #fff;
+      }
     }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.js"></script>
@@ -61,12 +71,12 @@
 
     // Add an event listener to update metadata once when the audio starts playing
     audioPlayer.addEventListener('play', function() {
-      updateMetadata(); // Call updateMetadata when the audio starts playing
-    }, { once: true }); // Ensure the event handler is removed after it executes once
+      updateMetadata();
+    }, { once: true });
 
     // Add an event listener to automatically skip to the next track when the current one ends
     audioPlayer.addEventListener('ended', function() {
-      skipTrack(); // Call skipTrack when the audio ends
+      skipTrack();
     });
   });
   </script>
