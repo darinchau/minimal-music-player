@@ -113,20 +113,6 @@ def play_random():
                 continue # Loops back to the beginning of the while loop to play another song
 
             print(f"User: {user_id} finished getting data for {id}")
-            while True:
-                metadata = r.get(f"audio_{user_id}")
-                # Play another audio if metadata is None or metadata is changed (the latter should not happen but just in case)
-                if metadata is None:
-                    print(f"User: {user_id} stopped playing {id}")
-                    break
-                if metadata == SKIPPED:
-                    print(f"User: {user_id} skipped audio {id}")
-                    break
-                if metadata != get_metadata_content(title, id):
-                    print(f"User: {user_id} is playing another audio")
-                    break
-                print(f"User: {user_id} is still playing {id}")
-                time.sleep(0.5)
 
     audios = AudioFile.query.filter_by(active=True, format=format).all()
     if not audios:
