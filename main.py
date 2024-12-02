@@ -88,6 +88,7 @@ def play_random():
 
     def stream(paths):
         check_skip = CHECK_SKIP_INTERVAL
+        shortcut = 5000
         while True:
             path, id, title = random.choice(paths)
             r.set(f"audio_{user_id}", get_metadata_content(title, id))
@@ -100,9 +101,11 @@ def play_random():
                         yield data
                         data = fwav.read(CHUNK)
                         check_skip -= 1
+                        shortcut -= 1
+                        if shortcut <= 0:
+                            break
                         if check_skip <= 0:
                             check_skip = CHECK_SKIP_INTERVAL
-                            print(f"User: {user_id} checking if audio is skipped")
                             if r.get(f"audio_{user_id}") == SKIPPED:
                                 print(f"User: {user_id} skipped playing {id}")
                                 break
