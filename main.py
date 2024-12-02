@@ -102,9 +102,11 @@ def play_random():
                         check_skip -= 1
                         if check_skip <= 0:
                             check_skip = CHECK_SKIP_INTERVAL
+                            print(f"User: {user_id} checking if audio is skipped")
                             if r.get(f"audio_{user_id}") == SKIPPED:
                                 print(f"User: {user_id} skipped playing {id}")
                                 break
+                    print(f"User: {user_id} exited loop for {id}")
             except Exception as e:
                 print(e)
                 print(traceback.format_exc())
@@ -124,6 +126,7 @@ def play_random():
                 if metadata != get_metadata_content(title, id):
                     print(f"User: {user_id} is playing another audio")
                     break
+                print(f"User: {user_id} is still playing {id}")
                 time.sleep(0.5)
 
     audios = AudioFile.query.filter_by(active=True, format=format).all()
