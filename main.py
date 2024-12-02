@@ -88,7 +88,7 @@ def play_random():
 
     def stream(paths):
         check_skip = CHECK_SKIP_INTERVAL
-        shortcut = 5000
+        shortcut = 1000
         while True:
             path, id, title = random.choice(paths)
             r.set(f"audio_{user_id}", get_metadata_content(title, id))
@@ -136,7 +136,7 @@ def play_random():
     if not audios:
         return jsonify({"error": "File not found"}), 404
     paths = [(audio.filename, audio.id, audio.title) for audio in audios]
-    return Response(stream(paths), mimetype=AudioFile.ACCEPTED_FORMATS[format])
+    return Response(stream_with_context(stream(paths)), mimetype=AudioFile.ACCEPTED_FORMATS[format])
 
 @app.route('/metadata')
 def get_metadata():
