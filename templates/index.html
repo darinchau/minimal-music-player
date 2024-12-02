@@ -56,6 +56,10 @@
         } else {
           $('#metadata').text("Currently, no track information is available.");
         }
+        // If audio player is not playing, start playing music
+        if (audioPlayer.paused) {
+          playMusic();
+        }
       }).fail(function() {
         $('#metadata').text("Error: Could not fetch track information.");
         // Retry fetching metadata after a delay
@@ -84,12 +88,6 @@
     audioPlayer.addEventListener('play', function() {
       updateMetadata();
     }, { once: true });
-
-    // Add an event listener to update metadata when the audio ends
-    audioPlayer.addEventListener('ended', function() {
-      console.log('Track ended');
-      updateMetadata();
-    });
   });
   </script>
 </head>
