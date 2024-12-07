@@ -80,6 +80,9 @@ def play(current_track, current_chunk):
     if not song:
         return jsonify({'error': f'Song not found: {current_track}'}), 404
 
+    if current_chunk < 0:
+        return jsonify({'error': f'Invalid chunk: {current_chunk}'}), 400
+
     # Get the song file
     song_file = os.path.join(app.config['UPLOAD_FOLDER'], song.filename)
     if not os.path.exists(song_file):
@@ -88,16 +91,16 @@ def play(current_track, current_chunk):
     # Get the song format
     format = song.format
 
-    # Return the song
-    def generate():
-        max_available_chunks = os.path.getsize(song_file) // CHUNK_SIZE
-        with open(song_file, 'rb') as f:
-            f.seek(current_chunk * CHUNK_SIZE)
-            for i in range(min(10, max_available_chunks)):
-                chunk = f.read(CHUNK_SIZE)
-                yield chunk
+    max_available_chunks = os.path.getsize(song_file) // CHUNK_SIZE
+    if current_chunk >= max_available_chunks:
+        return jsonify({'error': 'End of song'}), 404
 
-    return Response(stream_with_context(generate()), mimetype=AudioFile.ACCEPTED_FORMATS[format])
+
+    # Return the song
+    with open(song_file, 'rb') as f:
+        f.seek(current_chunk * CHUNK_SIZE)
+        chunk = f.read(CHUNK_SIZE)
+    return Response(chunk, mimetype=AudioFile.ACCEPTED_FORMATS[format])
 
 if __name__ == '__main__':
     app.run(debug=True, port=8123)
