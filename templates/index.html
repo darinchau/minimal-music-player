@@ -76,10 +76,15 @@
             audioctx.current_chunk++;
             loadSongWebAudioAPI(); // Make an extra call to give some room for buffer
           } else {
+            // Sum all the durations of the previous sources
+            let total_duration = 0;
+            for (let i = 0; i < source_queues.length; i++) {
+              total_duration += source_queues[i].buffer.duration;
+            }
             setTimeout(() => {
               source.connect(context.destination);
               source.start();
-            }, source_queues[source_queues.length - 1].buffer.duration - context.currentTime);
+            }, (total_duration - context.currentTime) * 1000);
             console.log(source_queues[source_queues.length - 1].buffer.duration - context.currentTime, "delayed start");
           }
           console.log(source.buffer.duration, "loaded");
