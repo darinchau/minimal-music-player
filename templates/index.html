@@ -45,7 +45,6 @@
       current_track: -1,
       current_chunk: -1,
     }
-    const audioFormat = "audio/mpeg";
 
     var context = new (window.AudioContext || window.webkitAudioContext)();
 
@@ -88,6 +87,8 @@
               audioctx.current_chunk++;
               loadSongWebAudioAPI();
             }
+          }, function () {
+            console.log('Error decoding audio data');
           });
         }
 

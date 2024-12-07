@@ -72,7 +72,6 @@ def get_value(key, default: int | None = None):
             raise BadRequest(f'Invalid {key}: {value}')
         return default
 
-
 # Routes
 @app.route('/')
 def index():
@@ -143,6 +142,63 @@ def metadata():
         return jsonify({'error': f'Song not found: {current_track}'}), 404
 
     return Response(get_metadata_content(song.title, song.url_id), mimetype='text/html')
+
+@app.route('/upload', methods=['POST'])
+def upload_file():
+    file = request.files['audio']
+    url_id = request.form['url_id']
+    format = request.form['format']
+    if len(url_id) != 11:
+        return jsonify({"error": "Invalid URL ID"}), 400
+
+    if format not in AudioFile.ACCEPTED_FORMATS:
+        return jsonify({"error": f"Invalid format: {format}"}), 400
+
+    exist_url_id = AudioFile.query.filter_by(url_id=url_id).first()
+    if exist_url_id:
+        return jsonify({"error": f"URL ID {url_id} already exists"}), 400
+
+    if file and file.filename is not None:
+        file_ext = os.path.splitext(file.filename)[1]
+        filename = secure_filename(f"{url_id}{file_ext}")
+        print(f"Saving file: {file.filename} to {filename}")
+        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        audio_file = AudioFile(
+            title=request.form['title'],
+            filename=filename,
+            url_id=url_id,
+            format=format,
+            active=True,
+        )
+        db.session.add(audio_file)
+        db.session.commit()
+        return jsonify({"message": "File uploaded successfully", "id": audio_file.id})
+
+    return jsonify({"error": "Invalid file"}), 400
+
+@app.route('/remove', methods=['DELETE'])
+def remove_file():
+    audio_id = request.form['id']
+    audio = AudioFile.query.get(audio_id)
+    if audio:
+        # Remove file from disk
+        os.remove(os.path.join(app.config['UPLOAD_FOLDER'], audio.filename))
+        # Remove from db
+        db.session.delete(audio)
+        db.session.commit()
+        return jsonify({"message": "File removed successfully"})
+    return jsonify({"error": "File not found"}), 404
+
+@app.route('/toggle', methods=['POST'])
+def toggle_file():
+    audio_id = request.form['id']
+    target = request.form['target']
+    audio = db.session.query(AudioFile).filter_by(id=audio_id).first()
+    if audio:
+        audio.active = target
+        db.session.commit()
+        return jsonify({"message": "File toggled successfully"})
+    return jsonify({"error": "File not found"}), 404
 
 if __name__ == '__main__':
     app.run(debug=True, port=8123)
