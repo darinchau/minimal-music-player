@@ -79,7 +79,8 @@
             setTimeout(() => {
               source.connect(context.destination);
               source.start();
-            }, source_queues[source_queues.length - 1].buffer.duration - context.currentTime)
+            }, source_queues[source_queues.length - 1].buffer.duration - context.currentTime);
+            console.log(source_queues[source_queues.length - 1].buffer.duration - context.currentTime, "delayed start");
           }
           console.log(source.buffer.duration, "loaded");
           source_queues.push(source);
