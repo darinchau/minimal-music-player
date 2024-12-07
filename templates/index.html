@@ -5,13 +5,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Minimal Music Player</title>
-  <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
   <style>
     body {
       font-family: Arial, sans-serif;
       text-align: center;
       margin-top: 50px;
-      /* Default light theme */
       background-color: #fff;
       color: #000;
     }
@@ -26,7 +24,6 @@
       margin-top: 20px;
     }
 
-    /* Dark theme styles */
     @media (prefers-color-scheme: dark) {
       body {
         background-color: #333;
@@ -35,7 +32,6 @@
 
       a {
         color: #4a90e2;
-        /* A lighter blue for better visibility on dark backgrounds */
       }
     }
   </style>
@@ -45,86 +41,75 @@
       current_track: -1,
       current_chunk: -1,
     }
-
-    var chunk_queue = [];
-    var first_load = true;
     var context = new (window.AudioContext || window.webkitAudioContext)();
+    var source = null;
+    var bufferQueue = [];
 
     function init() {
-      // Merge two audio buffers into one.
-      function appendBuffer(buffer1, buffer2) {
-        var numberOfChannels = Math.min(buffer1.numberOfChannels, buffer2.numberOfChannels);
-        var tmp = context.createBuffer(numberOfChannels, (buffer1.length + buffer2.length), buffer1.sampleRate);
-        for (var i = 0; i < numberOfChannels; i++) {
-          var channel = tmp.getChannelData(i);
-          channel.set(buffer1.getChannelData(i), 0);
-          channel.set(buffer2.getChannelData(i), buffer1.length);
-        }
-        return tmp;
+      loadSongWebAudioAPI();
+    }
+
+    function appendBuffer(buffer1, buffer2) {
+      var numberOfChannels = Math.min(buffer1.numberOfChannels, buffer2.numberOfChannels);
+      var tmp = context.createBuffer(numberOfChannels, (buffer1.length + buffer2.length), buffer1.sampleRate);
+      for (var i = 0; i < numberOfChannels; i++) {
+        var channel = tmp.getChannelData(i);
+        channel.set(buffer1.getChannelData(i), 0);
+        channel.set(buffer2.getChannelData(i), buffer1.length);
+      }
+      return tmp;
+    }
+
+    function loadSongWebAudioAPI() {
+      if (audioctx.current_track === -1) {
+        $.get('/get', audioctx, function (data) {
+          audioctx.current_track = data.current_track;
+          audioctx.current_chunk = 0;
+          fetchMetadata();
+          loadSongWebAudioAPI();
+        });
+        return;
       }
 
-      function loadSongWebAudioAPI() {
-        if (audioctx.current_track == -1) {
-          $.get('/get', audioctx, function (data) {
-            audioctx.current_track = data.current_track;
-            audioctx.current_chunk = 0;
-            fetchMetadata();
-            loadSongWebAudioAPI();
-          });
-          return;
-        }
+      var request = new XMLHttpRequest();
+      request.open('GET', `/play?current_track=${audioctx.current_track}&current_chunk=${audioctx.current_chunk}`, true);
+      request.responseType = 'arraybuffer';
 
-        var request = new XMLHttpRequest();
-        request.open('GET', '/play?current_track=' + audioctx.current_track + '&current_chunk=' + audioctx.current_chunk, true);
-        request.responseType = 'arraybuffer';
-
-        function play(arrayBuffer) {
-          context.decodeAudioData(arrayBuffer, function (audioBuffer) {
-            var source = context.createBufferSource();
-            source.buffer = audioBuffer;
+      request.onload = function () {
+        context.decodeAudioData(request.response, function (decodedData) {
+          if (!source) {
+            source = context.createBufferSource();
+            source.buffer = decodedData;
+            source.connect(context.destination);
+            source.start();
+          } else {
+            var newBuffer = appendBuffer(source.buffer, decodedData);
+            source.stop();
+            source = context.createBufferSource();
+            source.buffer = newBuffer;
             source.connect(context.destination);
             source.start(0);
-            source.onended = function () {
-              var next_chunk = chunk_queue.shift();
-              if (typeof next_chunk !== 'undefined') {
-                play(next_chunk);
-              }
-              audioctx.current_chunk++;
-              loadSongWebAudioAPI();
-            }
-          }, function () {
-            console.log('Error decoding audio data');
-          });
-        }
-
-        // When the song is loaded asynchronously try to play it.
-        request.onload = function () {
-          chunk_queue.push(request.response);
-          if (first_load) {
-            first_load = false;
-            audioctx.current_chunk++;
-            loadSongWebAudioAPI();
-            play(chunk_queue.shift());
           }
-        }
-
-        request.send();
+          audioctx.current_chunk++;
+          setTimeout(loadSongWebAudioAPI, (source.buffer.duration - context.currentTime) * 1000);
+        });
       }
 
-      loadSongWebAudioAPI();
+      request.send();
     }
 
     window.addEventListener('load', init, false);
 
-    // Skip song button
     $('#skip-button').click(function () {
       audioctx.current_track = -1;
       audioctx.current_chunk = -1;
-      next_chunk = undefined;
+      if (source) {
+        source.stop();
+        source = null;
+      }
       loadSongWebAudioAPI();
     });
 
-    // Fetch metadata
     function fetchMetadata() {
       $.get('/metadata', audioctx, function (data) {
         $('#metadata').html(data);
@@ -135,7 +120,6 @@
 
 <body>
   <h1>Minimal Music Player</h1>
-  <audio controls id="audioElement"> </audio>
   <div id="metadata">Loading track information...</div>
   <button id="skip-button">Skip song</button>
 </body>
