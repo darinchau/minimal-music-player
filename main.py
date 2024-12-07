@@ -12,11 +12,7 @@ from sqlalchemy import Integer
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
 from sqlalchemy.orm import relationship
-import random
-import time
-import uuid
-import traceback
-import threading
+from sqlalchemy.sql.expression import func
 
 import dotenv
 dotenv.load_dotenv()
@@ -67,6 +63,18 @@ def get_metadata_content(title, url_id):
 def index():
     return render_template('index.html')
 
+@app.route('/get', methods=['GET'])
+def get():
+    """
+    Get a random song from the database
+    """
+    song = db.session.query(AudioFile).filter_by(active=True).order_by(func.random()).first()
+
+    if not song:
+        return jsonify({'error': 'No songs found'}), 404
+
+    return jsonify({'current_track': song.id})
+
 @app.route('/play?current_track=<int:current_track>&current_chunk=<int:current_chunk>', methods=['GET'])
 def play(current_track, current_chunk):
     """
@@ -75,13 +83,13 @@ def play(current_track, current_chunk):
     - current_chunk: the current chunk of the song to play
     """
 
+    if current_chunk < 0:
+        return jsonify({'error': f'Invalid chunk: {current_chunk}'}), 400
+
     # Get the song
     song = db.session.query(AudioFile).filter_by(id=current_track).first()
     if not song:
         return jsonify({'error': f'Song not found: {current_track}'}), 404
-
-    if current_chunk < 0:
-        return jsonify({'error': f'Invalid chunk: {current_chunk}'}), 400
 
     # Get the song file
     song_file = os.path.join(app.config['UPLOAD_FOLDER'], song.filename)

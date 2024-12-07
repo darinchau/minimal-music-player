@@ -50,6 +50,7 @@
     var context = new (window.AudioContext || window.webkitAudioContext)();
 
     function init() {
+      // Merge two audio buffers into one.
       function appendBuffer(buffer1, buffer2) {
         var numberOfChannels = Math.min(buffer1.numberOfChannels, buffer2.numberOfChannels);
         var tmp = context.createBuffer(numberOfChannels, (buffer1.length + buffer2.length), buffer1.sampleRate);
@@ -62,28 +63,30 @@
       }
 
       function loadSongWebAudioAPI() {
+        if (audioctx.current_track == -1) {
+          $.get('/get', audioctx, function (data) {
+            audioctx = data;
+            fetchMetadata();
+          });
+        }
+
         var request = new XMLHttpRequest();
         request.open('GET', '/play?current_track=' + audioctx.current_track + '&current_chunk=' + audioctx.current_chunk, true);
         request.responseType = 'arraybuffer';
 
-        /**
-         * Appends two ArrayBuffers into a new one.
-         *
-         * @param {ArrayBuffer} data The ArrayBuffer that was loaded.
-         */
-        function play(data) {
-          //decode the loaded data
-          context.decodeAudioData(data, function (buf) {
-            var audioSource = context.createBufferSource();
-            audioSource.connect(context.destination);
-
-            // Concatenate the two buffers into one.
-            audioSource.buffer = appendBuffer(buf, buf);
-            audioSource.noteOn(0);
-            audioSource.playbackRate.value = 1;
+        function play(arrayBuffer) {
+          context.decodeAudioData(arrayBuffer, function (audioBuffer) {
+            var audioElement = document.getElementById('audioElement');
+            var source = context.createBufferSource();
+            source.buffer = audioBuffer;
+            source.connect(context.destination);
+            source.start(0);
+            source.onended = function () {
+              audioctx.current_chunk++;
+              loadSongWebAudioAPI();
+            }
           });
-
-        };
+        }
 
         // When the song is loaded asynchronously try to play it.
         request.onload = function () {
@@ -92,7 +95,6 @@
 
         request.send();
       }
-
 
       loadSongWebAudioAPI();
     }
