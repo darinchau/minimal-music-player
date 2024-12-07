@@ -114,10 +114,11 @@
     });
 
     // Skip song button
-    document.getElementById('skip-button').addEventListener('click', function () {
-      context.current_track = -1;
-      context.current_chunk = -1;
-      fetchStream();
+    $('#skip-button').click(function () {
+      $.get('/skip', context, function (data) {
+        context = data;
+        fetchMetadata();
+      });
     });
 
     // Fetch metadata
