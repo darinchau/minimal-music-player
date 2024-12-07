@@ -46,6 +46,8 @@
       current_chunk: -1,
     }
 
+    var next_chunk;
+
     var context = new (window.AudioContext || window.webkitAudioContext)();
 
     function init() {
@@ -94,7 +96,15 @@
 
         // When the song is loaded asynchronously try to play it.
         request.onload = function () {
-          play(request.response);
+          // Check if next_chunk is defined
+          if (typeof next_chunk !== 'undefined') {
+            play(next_chunk);
+            next_chunk = request.response;
+          }
+          else {
+            next_chunk = request.response;
+            loadSongWebAudioAPI();
+          }
         }
 
         request.send();
@@ -109,6 +119,7 @@
     $('#skip-button').click(function () {
       audioctx.current_track = -1;
       audioctx.current_chunk = -1;
+      next_chunk = undefined;
       loadSongWebAudioAPI();
     });
 
