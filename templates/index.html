@@ -47,7 +47,7 @@
     }
     const audioFormat = "audio/mpeg";
 
-    var context = new webkitAudioContext();
+    var context = new window.webkitAudioContext();
 
     function init() {
       function appendBuffer(buffer1, buffer2) {
