@@ -47,7 +47,7 @@
     }
 
     var chunk_queue = [];
-
+    var first_load = true;
     var context = new (window.AudioContext || window.webkitAudioContext)();
 
     function init() {
@@ -99,9 +99,9 @@
 
         // When the song is loaded asynchronously try to play it.
         request.onload = function () {
-          var first_load = chunk_queue.length == 0;
           chunk_queue.push(request.response);
           if (first_load) {
+            first_load = false;
             audioctx.current_chunk++;
             loadSongWebAudioAPI();
             play(chunk_queue.shift());
