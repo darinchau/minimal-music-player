@@ -12,7 +12,6 @@ from sqlalchemy import Integer
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
 from sqlalchemy.orm import relationship
-import redis
 import random
 import time
 import uuid
@@ -22,12 +21,7 @@ import threading
 import dotenv
 dotenv.load_dotenv()
 
-# Chunk size for audio processing
-CHUNK = 1024
-
-CHECK_SKIP_INTERVAL = 100
-
-SKIPPED = "-skipped"
+CHUNK_SIZE = 4096
 
 #### Setup db ####
 db = SQLAlchemy()
@@ -65,92 +59,45 @@ with app.app_context() as ctx:
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
 
-redis_host = os.getenv('REDISHOST', 'localhost')
-redis_port = int(os.getenv('REDIS_PORT', 6379))
-redis_password = os.getenv('REDIS_PASSWORD', None)
-
-r = redis.Redis(host=redis_host, port=redis_port, password=redis_password, decode_responses=True)
-
 def get_metadata_content(title, url_id):
     return f"Now Playing: <a href=\"https://www.youtube.com/watch?v={url_id}\" target=\"_blank\">{title}</a>"
 
 # Routes
 @app.route('/')
 def index():
-    if 'user_id' not in session:
-        session['user_id'] = str(uuid.uuid4())  # Generate a unique user_id
     return render_template('index.html')
 
-@app.route('/play', methods=['GET'])
-def play_random():
-    format = "ogg"
-    user_id = session['user_id']
+@app.route('/play?current_track=<int:current_track>&current_chunk=<int:current_chunk>', methods=['GET'])
+def play(current_track, current_chunk):
+    """
+    Main endpoint for our app. This gets a specified number of chunks of a specific song and returns them to the client
+    - current_track: the id of the song to play
+    - current_chunk: the current chunk of the song to play
+    """
 
-    def stream(paths):
-        check_skip = CHECK_SKIP_INTERVAL
-        while True:
-            path, id, title = random.choice(paths)
-            r.set(f"audio_{user_id}", get_metadata_content(title, id))
-            print(f"User: {user_id} is playing {id}")
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], path)
-            try:
-                with open(file_path, "rb") as fwav:
-                    data = fwav.read(CHUNK)
-                    while data:
-                        yield data
-                        data = fwav.read(CHUNK)
-                        check_skip -= 1
-                        if check_skip <= 0:
-                            check_skip = CHECK_SKIP_INTERVAL
-                            if r.get(f"audio_{user_id}") == SKIPPED:
-                                print(f"User: {user_id} skipped playing {id}")
-                                break
-            except Exception as e:
-                print(e)
-                print(traceback.format_exc())
-                time.sleep(1)
-                continue # Loops back to the beginning of the while loop to play another song
+    # Get the song
+    song = db.session.query(AudioFile).filter_by(id=song_id).first()
+    if not song:
+        return jsonify({'error': 'Song not found'}), 404
 
-            print(f"User: {user_id} finished getting data for {id}")
-            while True:
-                metadata = r.get(f"audio_{user_id}")
-                # Play another audio if metadata is None or metadata is changed (the latter should not happen but just in case)
-                if metadata is None:
-                    print(f"User: {user_id} stopped playing {id}")
-                    break
-                if metadata == SKIPPED:
-                    print(f"User: {user_id} skipped audio {id}")
-                    break
-                if metadata != get_metadata_content(title, id):
-                    print(f"User: {user_id} is playing another audio")
-                    break
-                time.sleep(0.5)
+    # Get the song file
+    song_file = os.path.join(app.config['UPLOAD_FOLDER'], song.filename)
+    if not os.path.exists(song_file):
+        return jsonify({'error': 'Song file not found'}), 404
 
-    audios = AudioFile.query.filter_by(active=True, format=format).all()
-    if not audios:
-        return jsonify({"error": "File not found"}), 404
-    paths = [(audio.filename, audio.id, audio.title) for audio in audios]
-    return Response(stream(paths), mimetype=AudioFile.ACCEPTED_FORMATS[format])
+    # Get the song format
+    format = song.format
 
-@app.route('/metadata')
-def get_metadata():
-    user_id = session['user_id']
-    audio_id = r.get(f"audio_{user_id}")
-    if audio_id is None:
-        return jsonify({"error": "No audio currently playing"}), 404
-    if audio_id == SKIPPED:
-        return jsonify({"error": "Audio skipped"}), 404
-    return jsonify({"html": audio_id})
+    # Return the song
+    def generate():
+        max_available_chunks = os.path.getsize(song_file) // CHUNK_SIZE
+        with open(song_file, 'rb') as f:
+            f.seek(current_chunk * CHUNK_SIZE)
+            for i in range(min(10, max_available_chunks)):
+                chunk = f.read(CHUNK_SIZE)
+                yield chunk
 
-@app.route('/skip', methods=['POST'])
-def skip():
-    user_id = session['user_id']
-    audio_id = r.get(f"audio_{user_id}")
-    if audio_id is None:
-        return jsonify({"error": "No audio currently playing"}), 404
-    print(f"User: {user_id} skipped audio")
-    r.set(f"audio_{user_id}", SKIPPED)
-    return jsonify({"message": "Audio skipped"})
+    return Response(stream_with_context(generate()), mimetype=AudioFile.ACCEPTED_FORMATS[format])
 
 if __name__ == '__main__':
     app.run(debug=True, port=8123)

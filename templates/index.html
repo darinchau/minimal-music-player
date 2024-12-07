@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -14,11 +15,14 @@
       background-color: #fff;
       color: #000;
     }
+
     audio {
       width: 100%;
       max-width: 600px;
     }
-    #metadata, #skip-button {
+
+    #metadata,
+    #skip-button {
       margin-top: 20px;
     }
 
@@ -28,78 +32,108 @@
         background-color: #333;
         color: #fff;
       }
+
       a {
-        color: #4a90e2; /* A lighter blue for better visibility on dark backgrounds */
+        color: #4a90e2;
+        /* A lighter blue for better visibility on dark backgrounds */
       }
     }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.js"></script>
   <script>
-  $(document).ready(function(){
-    const audioPlayer = $('audio')[0];  // Using jQuery to reference the audio player
-
-    function playMusic() {
-      try {
-        audioPlayer.play();
-      } catch (error) {
-        console.error('Error playing audio:', error);
-        setTimeout(playMusic, 3000); // Retry playing music after a delay
-      }
-      updateMetadata();
+    let context = {
+      currentTrack: -1,
+      current_chunk: -1,
     }
+    const audioFormat = "audio/ogg";
+    document.addEventListener('DOMContentLoaded', function () {
+      const mediaSource = new MediaSource();
+      const audioElement = document.getElementById('audioElement');
+      let sourceBuffer;
+      let queue = [];
 
-    function updateMetadata() {
-      $.getJSON('/metadata', function(data) {
-        if (data.html) {
-          // Create a clickable link for the title that points to the URL
-          $('#metadata').html(`${data.html}`);
+      audioElement.src = URL.createObjectURL(mediaSource);
+
+      // Add the pause event
+      audioElement.addEventListener('pause', function () {
+        if (audioElement.paused) {
+          audioElement.play();
+          if (mediaSource.readyState === 'closed') {
+            mediaSource.addSourceBuffer(audioFormat);
+          }
         } else {
-          $('#metadata').text("Currently, no track information is available.");
+          audioElement.pause();
         }
-      }).fail(function() {
-        $('#metadata').text("Error: Could not fetch track information.");
-        // Retry fetching metadata after a delay
-        setTimeout(updateMetadata, 3000);
       });
-    }
 
-    function skipTrack() {
-      $.post('/skip', function() {
-        audioPlayer.pause();
-        audioPlayer.load(); // Reload the <audio> element to play the new track
-        playMusic();
-      }).fail(function() {
-        alert('Error: Could not skip track.');
+      mediaSource.addEventListener('sourceopen', function () {
+        sourceBuffer = mediaSource.addSourceBuffer(audioFormat);
+        sourceBuffer.mode = 'sequence';
+        fetchStream();
       });
-    }
 
-    $('#skip-button').click(function() {
-      skipTrack();
+      function fetchStream() {
+        const url = "/play";
+        const xhr = new XMLHttpRequest();
+        // Send a GET request with the current context
+        xhr.open('GET', url + '?current_track=' + context.current_track + '&current_chunk=' + context.current_chunk, true);
+        xhr.responseType = 'arraybuffer';
+
+        xhr.onload = function () {
+          if (xhr.status === 200) {
+            queue.push(xhr.response);
+            if (!sourceBuffer.updating && queue.length) {
+              sourceBuffer.appendBuffer(queue.shift());
+            }
+          } else {
+            console.error('Failed to fetch the audio stream.');
+          }
+        };
+
+        xhr.onprogress = function () {
+          if (xhr.response) {
+            queue.push(xhr.response);
+            xhr.response = null;
+            if (!sourceBuffer.updating && queue.length) {
+              sourceBuffer.appendBuffer(queue.shift());
+            }
+          }
+        };
+
+        xhr.send();
+      }
+
+      sourceBuffer.addEventListener('updateend', function () {
+        if (queue.length > 0 && !sourceBuffer.updating) {
+          sourceBuffer.appendBuffer(queue.shift());
+        }
+        if (!audioElement.paused && mediaSource.readyState === 'open' && sourceBuffer.buffered.length && audioElement.currentTime > sourceBuffer.buffered.end(0)) {
+          mediaSource.endOfStream();
+        }
+      });
     });
 
-    // Delay playing music slightly to ensure it loads
-    setTimeout(playMusic, 3000);
-
-    // Add an event listener to update metadata once when the audio starts playing
-    audioPlayer.addEventListener('play', function() {
-      updateMetadata();
-    }, { once: true });
-
-    // Add an event listener to update metadata when the audio ends
-    audioPlayer.addEventListener('ended', function() {
-      console.log('Track ended');
-      updateMetadata();
+    // Skip song button
+    document.getElementById('skip-button').addEventListener('click', function () {
+      context.current_track = -1;
+      context.current_chunk = -1;
+      fetchStream();
     });
-  });
+
+    // Fetch metadata
+    function fetchMetadata() {
+      $.get('/metadata', context, function (data) {
+        $('#metadata').html(data);
+      });
+    }
   </script>
 </head>
+
 <body>
   <h1>Minimal Music Player</h1>
-  <audio controls>
-    <source src="/play" type="audio/ogg">
-    Your browser does not support the audio element.
-  </audio>
+  <audio controls id="audioElement"> </audio>
   <div id="metadata">Loading track information...</div>
   <button id="skip-button">Skip song</button>
 </body>
+
 </html>
