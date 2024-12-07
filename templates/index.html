@@ -99,7 +99,7 @@
 
         // When the song is loaded asynchronously try to play it.
         request.onload = function () {
-          var first_load = length(chunk_queue) == 0;
+          var first_load = chunk_queue.length == 0;
           chunk_queue.push(request.response);
           if (first_load) {
             audioctx.current_chunk++;
