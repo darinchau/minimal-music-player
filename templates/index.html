@@ -73,6 +73,7 @@
           };
           if (source_queues.length == 0) {
             source.start();
+            loadSongWebAudioAPI(); // Make an extra call to give some room for buffer
           } else {
             source.start(source_queues[source_queues.length - 1].buffer.duration - context.currentTime);
           }
