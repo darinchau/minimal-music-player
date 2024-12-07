@@ -63,7 +63,7 @@
 
       function loadSongWebAudioAPI() {
         var request = new XMLHttpRequest();
-        request.open('GET', '/play?current_track=' + context.current_track + '&current_chunk=' + context.current_chunk, true);
+        request.open('GET', '/play?current_track=' + audioctx.current_track + '&current_chunk=' + audioctx.current_chunk, true);
         request.responseType = 'arraybuffer';
 
         /**
@@ -101,15 +101,15 @@
 
     // Skip song button
     $('#skip-button').click(function () {
-      $.get('/skip', context, function (data) {
-        context = data;
+      $.get('/skip', audioctx, function (data) {
+        audioctx = data;
         fetchMetadata();
       });
     });
 
     // Fetch metadata
     function fetchMetadata() {
-      $.get('/metadata', context, function (data) {
+      $.get('/metadata', audioctx, function (data) {
         $('#metadata').html(data);
       });
     }
