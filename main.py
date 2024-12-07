@@ -63,11 +63,16 @@ def get_metadata_content(title, url_id):
 def index():
     return render_template('index.html')
 
-@app.route('/get?current_track=<current_track>&current_chunk=<current_chunk>', methods=['GET'])
-def get(current_track, current_chunk):
+@app.route('/get', methods=['GET'])
+def get():
     """
     Get a random song from the database
     """
+    current_track = request.args.get('current_track')
+    if not current_track:
+        return jsonify({'error': 'Missing current_track'}), 400
+    current_track = int(current_track)
+
     # Get a random song that is not the current song and is active
     song = db.session.query(AudioFile).filter_by(active=True).filter(AudioFile.id != current_track).order_by(func.random()).first()
 
@@ -76,13 +81,22 @@ def get(current_track, current_chunk):
 
     return jsonify({'current_track': song.id})
 
-@app.route('/play?current_track=<current_track>&current_chunk=<current_chunk>', methods=['GET'])
-def play(current_track, current_chunk):
+@app.route('/play', methods=['GET'])
+def play():
     """
     Main endpoint for our app. This gets a specified number of chunks of a specific song and returns them to the client
     - current_track: the id of the song to play
     - current_chunk: the current chunk of the song to play
     """
+
+    current_track = request.args.get('current_track')
+    if not current_track:
+        return jsonify({'error': 'Missing current_track'}), 400
+    current_track = int(current_track)
+    current_chunk = request.args.get('current_chunk')
+    if not current_chunk:
+        return jsonify({'error': 'Missing current_chunk'}), 400
+    current_chunk = int(current_chunk)
 
     if current_chunk < 0:
         return jsonify({'error': f'Invalid chunk: {current_chunk}'}), 400
@@ -104,18 +118,22 @@ def play(current_track, current_chunk):
     if current_chunk >= max_available_chunks:
         return jsonify({'error': 'End of song'}), 404
 
-
     # Return the song
     with open(song_file, 'rb') as f:
         f.seek(current_chunk * CHUNK_SIZE)
         chunk = f.read(CHUNK_SIZE)
     return Response(chunk, mimetype=AudioFile.ACCEPTED_FORMATS[format])
 
-@app.route('/metadata?current_track=<int:current_track>', methods=['GET'])
-def metadata(current_track):
+@app.route('/metadata', methods=['GET'])
+def metadata():
     """
     Get the metadata for the current track
     """
+    current_track = request.args.get('current_track')
+    if not current_track:
+        return jsonify({'error': 'Missing current_track'}), 400
+    current_track = int(current_track)
+
     song = db.session.query(AudioFile).filter_by(id=current_track).first()
     if not song:
         return jsonify({'error': f'Song not found: {current_track}'}), 404
