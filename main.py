@@ -6,6 +6,7 @@ from flask_cors import CORS
 from flask import Flask, request, jsonify, session
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import secure_filename
+from werkzeug.exceptions import BadRequest
 from sqlalchemy import Integer, String, DateTime, Text, ForeignKey, Float, Boolean
 from sqlalchemy import ForeignKey
 from sqlalchemy import Integer
@@ -58,6 +59,20 @@ if not os.path.exists(app.config['UPLOAD_FOLDER']):
 def get_metadata_content(title, url_id):
     return f"Now Playing: <a href=\"https://www.youtube.com/watch?v={url_id}\" target=\"_blank\">{title}</a>"
 
+def get_value(key, default: int | None = None):
+    value = request.args.get(key)
+    if not value:
+        if not default:
+            raise BadRequest(f'Missing {key}')
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        if not default:
+            raise BadRequest(f'Invalid {key}: {value}')
+        return default
+
+
 # Routes
 @app.route('/')
 def index():
@@ -68,10 +83,7 @@ def get():
     """
     Get a random song from the database
     """
-    current_track = request.args.get('current_track')
-    if not current_track:
-        return jsonify({'error': 'Missing current_track'}), 400
-    current_track = int(current_track)
+    current_track = get_value('current_track')
 
     # Get a random song that is not the current song and is active
     song = db.session.query(AudioFile).filter_by(active=True).filter(AudioFile.id != current_track).order_by(func.random()).first()
@@ -89,14 +101,9 @@ def play():
     - current_chunk: the current chunk of the song to play
     """
 
-    current_track = request.args.get('current_track')
-    if not current_track:
-        return jsonify({'error': 'Missing current_track'}), 400
-    current_track = int(current_track)
-    current_chunk = request.args.get('current_chunk')
-    if not current_chunk:
-        return jsonify({'error': 'Missing current_chunk'}), 400
-    current_chunk = int(current_chunk)
+    # Get the current track
+    current_track = get_value('current_track')
+    current_chunk = get_value('current_chunk')
 
     if current_chunk < 0:
         return jsonify({'error': f'Invalid chunk: {current_chunk}'}), 400
@@ -129,10 +136,7 @@ def metadata():
     """
     Get the metadata for the current track
     """
-    current_track = request.args.get('current_track')
-    if not current_track:
-        return jsonify({'error': 'Missing current_track'}), 400
-    current_track = int(current_track)
+    current_track = get_value('current_track')
 
     song = db.session.query(AudioFile).filter_by(id=current_track).first()
     if not song:
