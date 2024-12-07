@@ -67,6 +67,7 @@
           $.get('/get', audioctx, function (data) {
             audioctx = data;
             fetchMetadata();
+            loadSongWebAudioAPI();
           });
         }
 

@@ -63,12 +63,13 @@ def get_metadata_content(title, url_id):
 def index():
     return render_template('index.html')
 
-@app.route('/get', methods=['GET'])
-def get():
+@app.route('/get?current_track=<int:current_track>&current_chunk=<int:current_chunk>', methods=['GET'])
+def get(current_track, current_chunk):
     """
     Get a random song from the database
     """
-    song = db.session.query(AudioFile).filter_by(active=True).order_by(func.random()).first()
+    # Get a random song that is not the current song and is active
+    song = db.session.query(AudioFile).filter_by(active=True).filter(AudioFile.id != current_track).order_by(func.random()).first()
 
     if not song:
         return jsonify({'error': 'No songs found'}), 404
@@ -109,6 +110,17 @@ def play(current_track, current_chunk):
         f.seek(current_chunk * CHUNK_SIZE)
         chunk = f.read(CHUNK_SIZE)
     return Response(chunk, mimetype=AudioFile.ACCEPTED_FORMATS[format])
+
+@app.route('/metadata?current_track=<int:current_track>', methods=['GET'])
+def metadata(current_track):
+    """
+    Get the metadata for the current track
+    """
+    song = db.session.query(AudioFile).filter_by(id=current_track).first()
+    if not song:
+        return jsonify({'error': f'Song not found: {current_track}'}), 404
+
+    return Response(get_metadata_content(song.title, song.url_id), mimetype='text/html')
 
 if __name__ == '__main__':
     app.run(debug=True, port=8123)
