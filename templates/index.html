@@ -65,7 +65,8 @@
       function loadSongWebAudioAPI() {
         if (audioctx.current_track == -1) {
           $.get('/get', audioctx, function (data) {
-            audioctx = data;
+            audioctx.current_track = data.current_track;
+            audioctx.current_chunk = 0;
             fetchMetadata();
             loadSongWebAudioAPI();
           });
