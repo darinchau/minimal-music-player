@@ -42,22 +42,10 @@
       current_chunk: -1,
     }
     var context = new (window.AudioContext || window.webkitAudioContext)();
-    var source = null;
-    var bufferQueue = [];
+    var source_queues = [];
 
     function init() {
       loadSongWebAudioAPI();
-    }
-
-    function appendBuffer(buffer1, buffer2) {
-      var numberOfChannels = Math.min(buffer1.numberOfChannels, buffer2.numberOfChannels);
-      var tmp = context.createBuffer(numberOfChannels, (buffer1.length + buffer2.length), buffer1.sampleRate);
-      for (var i = 0; i < numberOfChannels; i++) {
-        var channel = tmp.getChannelData(i);
-        channel.set(buffer1.getChannelData(i), 0);
-        channel.set(buffer2.getChannelData(i), buffer1.length);
-      }
-      return tmp;
     }
 
     function loadSongWebAudioAPI() {
@@ -77,16 +65,22 @@
 
       request.onload = function () {
         context.decodeAudioData(request.response, function (decodedData) {
-          if (!source) {
-            source = context.createBufferSource();
-            source.buffer = decodedData;
-            source.connect(context.destination);
+          var source = context.createBufferSource();
+          source.buffer = decodedData;
+          source.connect(context.destination);
+          source.onended = function () {
+            source_queues.shift();
+          };
+          if (source_queues.length == 0) {
             source.start();
           } else {
-            source.buffer = appendBuffer(source.buffer, decodedData);
+            source.start(source_queues[source_queues.length - 1].buffer.duration - context.currentTime);
           }
+          console.log(source.buffer.duration, "loaded");
+          source_queues.push(source);
           audioctx.current_chunk++;
-          setTimeout(loadSongWebAudioAPI, (source.buffer.duration - context.currentTime) * 1000);
+          setTimeout(loadSongWebAudioAPI, source.buffer.duration * 1000);
+          return;
         });
       }
 
