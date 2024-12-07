@@ -76,9 +76,9 @@ def play(current_track, current_chunk):
     """
 
     # Get the song
-    song = db.session.query(AudioFile).filter_by(id=song_id).first()
+    song = db.session.query(AudioFile).filter_by(id=current_track).first()
     if not song:
-        return jsonify({'error': 'Song not found'}), 404
+        return jsonify({'error': f'Song not found: {current_track}'}), 404
 
     # Get the song file
     song_file = os.path.join(app.config['UPLOAD_FOLDER'], song.filename)
