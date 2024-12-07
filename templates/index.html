@@ -67,16 +67,19 @@
         context.decodeAudioData(request.response, function (decodedData) {
           var source = context.createBufferSource();
           source.buffer = decodedData;
-          source.connect(context.destination);
           source.onended = function () {
             source_queues.shift();
           };
           if (source_queues.length == 0) {
+            source.connect(context.destination);
             source.start();
             audioctx.current_chunk++;
             loadSongWebAudioAPI(); // Make an extra call to give some room for buffer
           } else {
-            source.start(source_queues[source_queues.length - 1].buffer.duration - context.currentTime);
+            setTimeout(() => {
+              source.connect(context.destination);
+              source.start();
+            }, source_queues[source_queues.length - 1].buffer.duration - context.currentTime)
           }
           console.log(source.buffer.duration, "loaded");
           source_queues.push(source);
