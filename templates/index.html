@@ -106,10 +106,9 @@
 
     // Skip song button
     $('#skip-button').click(function () {
-      $.get('/skip', audioctx, function (data) {
-        audioctx = data;
-        fetchMetadata();
-      });
+      audioctx.current_track = -1;
+      audioctx.current_chunk = -1;
+      loadSongWebAudioAPI();
     });
 
     // Fetch metadata
