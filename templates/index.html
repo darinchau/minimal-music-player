@@ -46,7 +46,7 @@
       current_chunk: -1,
     }
 
-    var next_chunk;
+    var chunk_queue = [];
 
     var context = new (window.AudioContext || window.webkitAudioContext)();
 
@@ -80,12 +80,15 @@
 
         function play(arrayBuffer) {
           context.decodeAudioData(arrayBuffer, function (audioBuffer) {
-            var audioElement = document.getElementById('audioElement');
             var source = context.createBufferSource();
             source.buffer = audioBuffer;
             source.connect(context.destination);
             source.start(0);
             source.onended = function () {
+              var next_chunk = chunk_queue.shift();
+              if (typeof next_chunk !== 'undefined') {
+                play(next_chunk);
+              }
               audioctx.current_chunk++;
               loadSongWebAudioAPI();
             }
@@ -96,15 +99,12 @@
 
         // When the song is loaded asynchronously try to play it.
         request.onload = function () {
-          // Check if next_chunk is defined
-          if (typeof next_chunk !== 'undefined') {
-            play(next_chunk);
-            next_chunk = request.response;
-          }
-          else {
-            next_chunk = request.response;
+          var first_load = length(chunk_queue) == 0;
+          chunk_queue.push(request.response);
+          if (first_load) {
             audioctx.current_chunk++;
             loadSongWebAudioAPI();
+            play(chunk_queue.shift());
           }
         }
 
