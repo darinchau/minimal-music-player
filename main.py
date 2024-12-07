@@ -63,7 +63,7 @@ def get_metadata_content(title, url_id):
 def index():
     return render_template('index.html')
 
-@app.route('/get?current_track=<int:current_track>&current_chunk=<int:current_chunk>', methods=['GET'])
+@app.route('/get?current_track=<current_track>&current_chunk=<current_chunk>', methods=['GET'])
 def get(current_track, current_chunk):
     """
     Get a random song from the database
@@ -76,7 +76,7 @@ def get(current_track, current_chunk):
 
     return jsonify({'current_track': song.id})
 
-@app.route('/play?current_track=<int:current_track>&current_chunk=<int:current_chunk>', methods=['GET'])
+@app.route('/play?current_track=<current_track>&current_chunk=<current_chunk>', methods=['GET'])
 def play(current_track, current_chunk):
     """
     Main endpoint for our app. This gets a specified number of chunks of a specific song and returns them to the client
