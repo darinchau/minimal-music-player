@@ -90,7 +90,14 @@ def get():
     if not song:
         return jsonify({'error': 'No songs found'}), 404
 
-    return jsonify({'current_track': song.id})
+    song_file = os.path.join(app.config['UPLOAD_FOLDER'], song.filename)
+    if not os.path.exists(song_file):
+        return jsonify({'error': 'Song file not found'}), 404
+
+    # Return the song
+    max_available_chunks = os.path.getsize(song_file) // CHUNK_SIZE
+
+    return jsonify({'current_track': song.id, "max_chunks": max_available_chunks})
 
 @app.route('/play', methods=['GET'])
 def play():
@@ -118,24 +125,15 @@ def play():
     if not os.path.exists(song_file):
         return jsonify({'error': 'Song file not found'}), 404
 
-    # Get the song format
-    format = song.format
-
+    # Return the song
     max_available_chunks = os.path.getsize(song_file) // CHUNK_SIZE
     if current_chunk >= max_available_chunks:
         return jsonify({'error': 'End of song'}), 404
 
-    # Return the song
-    def generate():
-        with open(song_file, 'rb') as f:
-            f.seek(current_chunk * CHUNK_SIZE)
-            while True:
-                data = f.read(CHUNK_SIZE)
-                if not data:
-                    break
-                yield data
-
-    return Response(stream_with_context(generate()), mimetype=AudioFile.ACCEPTED_FORMATS[format])
+    with open(song_file, 'rb') as f:
+        f.seek(current_chunk * CHUNK_SIZE)
+        data = f.read(CHUNK_SIZE)
+    return Response(data, mimetype=AudioFile.ACCEPTED_FORMATS[song.format])
 
 @app.route('/metadata', methods=['GET'])
 def metadata():

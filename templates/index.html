@@ -7,60 +7,63 @@
   <script>
     var audioctx = {
       current_track: -1,
+      current_chunk: -1,
+      max_chunks: -1
+    }
+    var buffers = {};
+    var sources = {};
+
+    function initAudioCtx() {
+      fetch('/get?current_track=' + audioctx.current_track)
+        .then(response => response.json())
+        .then(data => {
+          audioctx.current_track = data.current_track;
+          audioctx.current_chunk = 0;
+        });
+    }
+
+    async function loadChunk(chunk_number) {
+      if (buffers[chunk_number]) {
+        return buffers[chunk_number];
+      }
+
+      const response = await fetch('/play?current_track=' + audioctx.current_track + '&current_chunk=' + chunk_number);
+      const arrayBuffer = await response.arrayBuffer();
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+      buffers[chunk_number] = audioBuffer;
+      return audioBuffer;
+    }
+
+    function clearAudioCtx() {
+      audioctx.current_track = -1;
+      audioctx.current_chunk = -1;
+      audioctx.max_chunks = -1;
     }
 
     document.addEventListener('DOMContentLoaded', function () {
       const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      const source = audioContext.createBufferSource();
-      let queue = [];
-      let buffers = [];
-      let firstLoad = true;
 
-      async function fetchAudio() {
-        // if current track is not defined, use /get to update the audio context first
-        if (audioctx.current_track === -1) {
-          const response = await fetch('/get');
-          const data = await response.json();
-          audioctx.current_track = data.current_track;
+      function playAudio() {
+        var accBufferTime = 0;
+        if (audioctx.current_chunk == -1) {
+          initAudioContext();
         }
 
-        const response = await fetch('/play?current_track=' + audioctx.current_track);
-        const reader = response.body.getReader();
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          audioContext.decodeAudioData(value.buffer, (buffer) => {
-            queue.push(buffer);
-            if (firstLoad) {
-              firstLoad = false;
-              playAudio();
-            }
-          }, (e) => {
-            console.log("Error decoding audio data", e);
+        for (var i = 0; i < audioctx.max_chunks; i++) {
+          loadChunk(i).then(function (buffer) {
+            const source = audioContext.createBufferSource();
+            source.buffer = buffer;
+            source.connect(audioContext.destination);
+            const offset = audioContext.currentTime + accBufferTime;
+            source.start(offset);
           });
         }
+
+        clearAudioCtx();
+        playAudio();
       }
 
-      function playAudio(schedule_playback_seconds = 0) {
-        if (queue.length > 0) {
-          const buffer = queue.shift();
-          const bufferSource = audioContext.createBufferSource();
-          bufferSource.buffer = buffer;
-          bufferSource.connect(audioContext.destination);
-          bufferSource.start(schedule_playback_seconds);
-          buffers.push(bufferSource);
-          bufferSource.onended = () => {
-            buffers.shift();
-            // Schedule another playback right after all the buffers
-            const total_duration = queue.reduce((acc, buffer) => acc + buffer.duration, 0);
-            playAudio(total_duration);
-          }
-        }
-      }
-
-      fetchAudio();
+      playAudio();
     });
   </script>
 </head>
