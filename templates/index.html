@@ -40,112 +40,170 @@
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.js"></script>
   <script>
-    var audioctx = {
+    let audioctx = {
       current_track: -1,
       current_chunk: -1,
-      max_chunks: -1
+      max_chunks: -1,
     }
-    var buffers = {};
-    var sources = {};
+    let audioContext;
+    let buffers = {}; // A cache for the audio buffers for the current song
+    let sources = {}; // The audio sources for the current song
+    let dirty = false; // True if events such as skip song have been triggered
+    let nextSongScheduleID = null; // The ID of the timeout to schedule the next song
 
-    function clearAudioContext() {
-      audioctx.current_track = -1;
-      audioctx.current_chunk = -1;
-      audioctx.max_chunks = -1;
+
+    function initAudioContext(baseTime) {
+      if (audioctx.current_track >= 0) {
+        return;
+      }
+
+      const response = $.get('/get', audioctx, function (data) {
+        audioctx.current_track = data.current_track;
+        audioctx.current_chunk = data.current_chunk;
+        audioctx.max_chunks = data.max_chunks;
+        playAudio(baseTime);
+      });
+    }
+
+    async function loadChunk(chunk_number, accBufferTime, chunk0LoadTime, baseTime) {
+      let buffer;
+      if (chunk_number >= audioctx.max_chunks) {
+        buffer = null;
+      }
+      else if (buffers[chunk_number]) {
+        buffer = buffers[chunk_number];
+      }
+      else {
+        const response = await fetch('/play?current_track=' + audioctx.current_track + '&current_chunk=' + chunk_number);
+        const arrayBuffer = await response.arrayBuffer();
+        buffer = await audioContext.decodeAudioData(arrayBuffer);
+        buffers[chunk_number] = buffer;
+      }
+      return [buffer, chunk_number, accBufferTime, chunk0LoadTime, baseTime];
+    }
+
+    function scheduleNextChunk(chunkBuffer) {
+      // If the song has been skipped, we need to clear all sources and buffers
+      if (dirty) {
+        dirty = false;
+        sources = {};
+        buffers = {};
+        playAudio(audioContext.currentTime + 1);
+        return;
+      }
+
+      let [audioBuffer, chunk_number, accBufferTime, chunk0LoadTime, baseTime] = chunkBuffer;
+      if (!audioBuffer) {
+        let loadNextSongTime = accBufferTime - audioContext.currentTime + baseTime + chunk0LoadTime;
+        console.log('No more chunks to play');
+        console.log('Scheduling to load next song after ', loadNextSongTime);
+        console.log('Current time', audioContext.currentTime, 'baseTime', baseTime, 'chunk0LoadTime', chunk0LoadTime, 'accBufferTime', accBufferTime);
+        nextSongScheduleID = setTimeout(function () {
+          console.log('Loading next song');
+          console.log(JSON.stringify(audioctx));
+          playAudio(audioContext.currentTime + 1);
+        }, loadNextSongTime * 1000);
+        return;
+      }
+      const source = audioContext.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(audioContext.destination);
+
+      // Schedule the audio slightly differnetly if the chunk is the first chunk
+      // If baseTime > now, then we are scheduling chunk 0 to play in the future
+      // Then chunk0LoadTime should be baseTime + 0
+      // Otherwise if basetime is in the past, then we are scheduling chunk 0 to play now
+      if (chunk0LoadTime === -1) {
+        console.log('Scheduling chunk', chunk_number, 'to play at', accBufferTime + chunk0LoadTime + baseTime);
+        console.log('accBufferTime', accBufferTime, 'chunk0LoadTime', chunk0LoadTime, 'baseTime', baseTime);
+        chunk0LoadTime = Math.max(audioContext.currentTime - baseTime, 0);
+        source.start(baseTime);
+      }
+      else {
+        console.log('Scheduling chunk', chunk_number, 'to play at', accBufferTime + chunk0LoadTime + baseTime);
+        console.log('accBufferTime', accBufferTime, 'chunk0LoadTime', chunk0LoadTime, 'baseTime', baseTime);
+        source.start(accBufferTime + chunk0LoadTime + baseTime);
+      }
+      sources[chunk_number] = source;
+      source.onended = function () {
+        source.disconnect();
+        delete sources[chunk_number];
+        updateMetadata();
+      };
+      loadChunk(
+        chunk_number + 1,
+        accBufferTime + audioBuffer.duration,
+        chunk0LoadTime,
+        baseTime).then(scheduleNextChunk);
+    }
+
+    // BaseTime in seconds is the time when the first chunk should be played
+    // Relative to the creation of the audio context
+    // If baseTime is in the past, then the first chunk should be played immediately
+    function playAudio(baseTime) {
+      if (audioctx.current_track === -1 || audioctx.current_chunk === -1 || audioctx.max_chunks === -1) {
+        initAudioContext(baseTime);
+        return;
+      }
+
+      console.log('Playing audio with baseTime', baseTime);
+      loadChunk(0, 0, -1, baseTime).then(scheduleNextChunk);
     }
 
     document.addEventListener('DOMContentLoaded', function () {
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
       console.log('Audio context created');
-
-      // accBufferTime is the accumulated buffer time of all the scheduled chunks
-
-      function initAudioContext() {
-        if (audioctx.current_track >= 0) {
-          return;
-        }
-
-        const response = $.get('/get', audioctx, function (data) {
-          audioctx.current_track = data.current_track;
-          audioctx.current_chunk = data.current_chunk;
-          audioctx.max_chunks = data.max_chunks;
-          playAudio();
-        });
-      }
-
-      async function loadChunk(chunk_number, accBufferTime, chunk0LoadTime, baseTime) {
-        if (chunk_number >= audioctx.max_chunks) {
-          return [null, null];
-        }
-        if (buffers[chunk_number]) {
-          return [buffers[chunk_number], chunk_number];
-        }
-
-        const response = await fetch('/play?current_track=' + audioctx.current_track + '&current_chunk=' + chunk_number);
-        const arrayBuffer = await response.arrayBuffer();
-        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-        buffers[chunk_number] = audioBuffer;
-        return [audioBuffer, chunk_number, accBufferTime, chunk0LoadTime, baseTime];
-      }
-
-      function scheduleNextChunk(chunkBuffer) {
-        let [audioBuffer, chunk_number, accBufferTime, chunk0LoadTime, baseTime] = chunkBuffer;
-        if (!audioBuffer) {
-          setTimeout(function () {
-            clearAudioContext();
-            playAudio(audioContext.currentTime + 1);
-          }, (accBufferTime - audioContext.currentTime + baseTime) * 1000);
-          return;
-        }
-        const source = audioContext.createBufferSource();
-        source.buffer = audioBuffer;
-        source.connect(audioContext.destination);
-
-        // Schedule the audio slightly differnetly if the chunk is the first chunk
-        // If baseTime > now, then we are scheduling chunk 0 to play in the future
-        // Then chunk0LoadTime should be baseTime + 0
-        // Otherwise if basetime is in the past, then we are scheduling chunk 0 to play now
-        if (chunk0LoadTime === -1) {
-          chunk0LoadTime = Math.max(audioContext.currentTime - baseTime, 0);
-          source.start(baseTime);
-        }
-        else {
-          console.log('Scheduling chunk', chunk_number, 'to play at', accBufferTime + chunk0LoadTime + baseTime);
-          console.log('accBufferTime', accBufferTime, 'chunk0LoadTime', chunk0LoadTime, 'baseTime', baseTime);
-          source.start(accBufferTime + chunk0LoadTime + baseTime);
-        }
-        sources[chunk_number] = source;
-        source.onended = function () {
-          source.disconnect();
-          delete sources[chunk_number];
-        };
-        loadChunk(
-          chunk_number + 1,
-          accBufferTime + audioBuffer.duration,
-          chunk0LoadTime,
-          baseTime).then(scheduleNextChunk);
-      }
-
-      // BaseTime in seconds is the time when the first chunk should be played
-      // Relative to the creation of the audio context
-      // If baseTime is in the past, then the first chunk should be played immediately
-      function playAudio(baseTime) {
-        if (audioctx.current_track === -1 || audioctx.current_chunk === -1 || audioctx.max_chunks === -1) {
-          initAudioContext();
-          return;
-        }
-
-        loadChunk(0, 0, -1, baseTime).then(scheduleNextChunk);
-      }
-
       playAudio(0);
+    });
+
+    // Update Metadata
+    function updateMetadata() {
+      $.getJSON('/metadata', audioctx, function (data) {
+        if (data.html) {
+          $('#metadata').html(`${data.html}`);
+        } else {
+          $('#metadata').text("Currently, no track information is available.");
+        }
+      }).fail(function () {
+        $('#metadata').text("Error: Could not fetch track information.");
+      });
+    }
+
+    // Skip Button
+    function skipTrack() {
+      // Clear all scheduled sources
+      for (let key in sources) {
+        sources[key].stop();
+        sources[key].disconnect();
+      }
+      if (nextSongScheduleID) {
+        clearTimeout(nextSongScheduleID);
+        // If the scheduling is in place, we need to clear stuff instead of relying on the next song to clean up
+        sources = {};
+        buffers = {};
+        playAudio(audioContext.currentTime + 1);
+      }
+      else {
+        // If the next song is still loading, to avoid race condition,
+        // we need to set dirty to true to avoid scheduling the next song
+        // and perform the cleanup inside the schedulingNextChunk function
+        dirty = true;
+      }
+    }
+
+    $(document).ready(function () {
+      $('#skip-button').click(function () {
+        console.log('Skipping song');
+        skipTrack();
+      });
     });
   </script>
 </head>
 
 <body>
-  <h1>Streaming Audio Player</h1>
-  <p>Audio is being streamed and played...</p>
+  <h1>Grace's Study Playlist</h1>
+  <div id="metadata">Loading track information...</div>
+  <button id="skip-button">Skip song</button>
 </body>
 
 </html>

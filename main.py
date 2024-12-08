@@ -146,13 +146,18 @@ def metadata():
     if not song:
         return jsonify({'error': f'Song not found: {current_track}'}), 404
 
-    return Response(get_metadata_content(song.title, song.url_id), mimetype='text/html')
+    return jsonify({"html": get_metadata_content(song.title, song.url_id)})
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
     file = request.files['audio']
     url_id = request.form['url_id']
     format = request.form['format']
+    secret = request.form['secret']
+
+    if secret != app.secret_key:
+        return jsonify({"error": "Invalid secret"}), 400
+
     if len(url_id) != 11:
         return jsonify({"error": "Invalid URL ID"}), 400
 
@@ -183,6 +188,10 @@ def upload_file():
 
 @app.route('/remove', methods=['DELETE'])
 def remove_file():
+    secret = request.form['secret']
+    if secret != app.secret_key:
+        return jsonify({"error": "Invalid secret"}), 400
+
     audio_id = request.form['id']
     audio = AudioFile.query.get(audio_id)
     if audio:
@@ -196,6 +205,10 @@ def remove_file():
 
 @app.route('/toggle', methods=['POST'])
 def toggle_file():
+    secret = request.form['secret']
+    if secret != app.secret_key:
+        return jsonify({"error": "Invalid secret"}), 400
+
     audio_id = request.form['id']
     target = request.form['target']
     audio = db.session.query(AudioFile).filter_by(id=audio_id).first()
