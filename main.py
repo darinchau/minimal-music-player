@@ -164,8 +164,9 @@ def upload_file():
     if format not in AudioFile.ACCEPTED_FORMATS:
         return jsonify({"error": f"Invalid format: {format}"}), 400
 
-    exist_url_id = AudioFile.query.filter_by(url_id=url_id).first()
-    if exist_url_id:
+    exist_url_id = db.session.query(AudioFile).filter_by(url_id=url_id).first()
+    exist_file = os.path.exists(os.path.join(app.config['UPLOAD_FOLDER'], exist_url_id.filename)) if exist_url_id is not None else False
+    if exist_url_id and exist_file:
         return jsonify({"error": f"URL ID {url_id} already exists"}), 400
 
     if file and file.filename is not None:
@@ -217,6 +218,15 @@ def toggle_file():
         db.session.commit()
         return jsonify({"message": "File toggled successfully"})
     return jsonify({"error": "File not found"}), 404
+
+@app.route('/listdir', methods=['GET'])
+def list_files():
+    secret = request.args.get('secret')
+    if secret != app.secret_key:
+        return jsonify({"error": "Invalid secret"}), 400
+
+    files = os.listdir(app.config['UPLOAD_FOLDER'])
+    return jsonify(files)
 
 if __name__ == '__main__':
     app.run(debug=True, port=8123)
