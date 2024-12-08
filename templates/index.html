@@ -91,6 +91,8 @@
         var accBufferTime = 0;
         if (audioctx.current_track === -1) {
           await initAudioContext();
+          console.log('Audio context initialized');
+          console.log(JSON.stringify(audioctx));
         }
 
         for (var i = 0; i < audioctx.max_chunks; i++) {
