@@ -221,7 +221,7 @@ def toggle_file():
 
 @app.route('/listdir', methods=['GET'])
 def list_files():
-    secret = request.args.get('secret')
+    secret = request.form['secret']
     if secret != app.secret_key:
         return jsonify({"error": "Invalid secret"}), 400
 
