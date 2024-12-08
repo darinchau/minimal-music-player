@@ -106,7 +106,7 @@
         // Then chunk0LoadTime should be baseTime + 0
         // Otherwise if basetime is in the past, then we are scheduling chunk 0 to play now
         if (chunk0LoadTime === -1) {
-          chunk0LoadTime = max(audioContext.currentTime - baseTime, 0);
+          chunk0LoadTime = Math.max(audioContext.currentTime - baseTime, 0);
           source.start(baseTime);
         }
         else {
