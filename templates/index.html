@@ -70,36 +70,37 @@
       const audioContext = new (window.AudioContext || window.webkitAudioContext)();
       console.log('Audio context created');
 
-      function initAudioContext() {
+      async function initAudioContext() {
         if (audioctx.current_track >= 0) {
           return;
         }
-        $.get('/get', audioctx, function (data) {
-          audioctx.current_track = data.current_track;
-          audioctx.current_chunk = 0;
-          audioctx.max_chunks = data.max_chunks;
-          console.log('Audio context initialized');
-          console.log(JSON.stringify(audioctx));
-          playAudio();
-        });
+
+        const response = await $.get('/play', audioctx);
+        audioctx.current_track = response.current_track;
+        audioctx.current_chunk = response.current_chunk;
+        audioctx.max_chunks = response.max_chunks;
+        console.log('Audio context initialized');
+        console.log('Current track:', audioctx.current_track);
+        console.log('Current chunk:', audioctx.current_chunk);
+        console.log('Max chunks:', audioctx.max_chunks);
+
+        return;
       }
 
-      function playAudio() {
+      async function playAudio() {
         var accBufferTime = 0;
         if (audioctx.current_track === -1) {
-          initAudioContext();
-          return;
+          await initAudioContext();
         }
 
         for (var i = 0; i < audioctx.max_chunks; i++) {
-          loadChunk(i).then(function (buffer) {
-            const source = audioContext.createBufferSource();
-            source.buffer = buffer;
-            source.connect(audioContext.destination);
-            const offset = audioContext.currentTime + accBufferTime;
-            source.start(offset);
-            accBufferTime += buffer.duration;
-          });
+          const audioBuffer = await loadChunk(i);
+          const source = audioContext.createBufferSource();
+          source.buffer = audioBuffer;
+          source.connect(audioContext.destination);
+          source.start(accBufferTime);
+          accBufferTime += audioBuffer.duration;
+          sources[i] = source;
         }
 
         setTimeout(function () {
