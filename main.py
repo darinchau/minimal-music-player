@@ -97,12 +97,11 @@ def play():
     """
     Main endpoint for our app. This gets a specified number of chunks of a specific song and returns them to the client
     - current_track: the id of the song to play
-    - current_chunk: the current chunk of the song to play
     """
 
     # Get the current track
     current_track = get_value('current_track')
-    current_chunk = get_value('current_chunk')
+    current_chunk = get_value('current_chunk', 0)
 
     if current_chunk < 0:
         return jsonify({'error': f'Invalid chunk: {current_chunk}'}), 400
@@ -125,10 +124,16 @@ def play():
         return jsonify({'error': 'End of song'}), 404
 
     # Return the song
-    with open(song_file, 'rb') as f:
-        f.seek(current_chunk * CHUNK_SIZE)
-        chunk = f.read(CHUNK_SIZE)
-    return Response(chunk, mimetype=AudioFile.ACCEPTED_FORMATS[format])
+    def generate():
+        with open(song_file, 'rb') as f:
+            f.seek(current_chunk * CHUNK_SIZE)
+            while True:
+                data = f.read(CHUNK_SIZE)
+                if not data:
+                    break
+                yield data
+
+    return Response(stream_with_context(generate()), mimetype=AudioFile.ACCEPTED_FORMATS[format])
 
 @app.route('/metadata', methods=['GET'])
 def metadata():
