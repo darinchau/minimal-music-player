@@ -3,36 +3,51 @@
 
 <head>
   <meta charset="UTF-8">
-  <title>Audio Stream Example</title>
+  <title>Stream and Play Audio</title>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const source = audioContext.createBufferSource();
+      let queue = [];
+
+      async function fetchAudio() {
+        const response = await fetch('/play');
+        const reader = response.body.getReader();
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          audioContext.decodeAudioData(value.buffer, (buffer) => {
+            queue.push(buffer);
+            if (queue.length === 1) {
+              playAudio();
+            }
+          }, (e) => {
+            console.log("Error decoding audio data", e);
+          });
+        }
+      }
+
+      function playAudio() {
+        if (queue.length > 0) {
+          const buffer = queue.shift();
+          const bufferSource = audioContext.createBufferSource();
+          bufferSource.buffer = buffer;
+          bufferSource.connect(audioContext.destination);
+          bufferSource.start();
+          bufferSource.onended = playAudio;
+        }
+      }
+
+      fetchAudio();
+    });
+  </script>
 </head>
 
 <body>
-  <h1>Audio Stream Example</h1>
-  <button id="playButton">Play Stream</button>
-
-  <script type="module">
-    document.getElementById('playButton').addEventListener('click', async () => {
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      await audioContext.audioWorklet.addModule('audio.js')
-      const audioNode = new AudioWorkletNode(audioContext, 'audio-processor');
-      audioNode.connect(audioContext.destination);
-
-      const response = await fetch('/play');
-      const reader = response.body.getReader();
-
-      async function read() {
-        const { value, done } = await reader.read();
-        if (done) {
-          return;
-        }
-        const audioBuffer = await audioContext.decodeAudioData(value.buffer);
-        audioNode.port.postMessage({ audioBuffer });
-        read();
-      }
-
-      read();
-    });
-  </script>
+  <h1>Streaming Audio Player</h1>
+  <p>Audio is being streamed and played...</p>
 </body>
 
 </html>
