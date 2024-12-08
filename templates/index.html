@@ -49,15 +49,18 @@
     var sources = {};
 
     async function loadChunk(chunk_number) {
+      if (chunk_number >= audioctx.max_chunks) {
+        return [null, null];
+      }
       if (buffers[chunk_number]) {
-        return buffers[chunk_number];
+        return [buffers[chunk_number], chunk_number];
       }
 
       const response = await fetch('/play?current_track=' + audioctx.current_track + '&current_chunk=' + chunk_number);
       const arrayBuffer = await response.arrayBuffer();
       const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
       buffers[chunk_number] = audioBuffer;
-      return audioBuffer;
+      return [audioBuffer, chunk_number];
     }
 
     function clearAudioContext() {
@@ -69,41 +72,45 @@
     document.addEventListener('DOMContentLoaded', function () {
       const audioContext = new (window.AudioContext || window.webkitAudioContext)();
       console.log('Audio context created');
+      let accBufferTime = 0;
+      const startLoadTime = audioContext.currentTime;
 
-      async function initAudioContext() {
+      function initAudioContext() {
         if (audioctx.current_track >= 0) {
           return;
         }
 
-        const response = await $.get('/play', audioctx);
-        audioctx.current_track = response.current_track;
-        audioctx.current_chunk = response.current_chunk;
-        audioctx.max_chunks = response.max_chunks;
-        console.log('Audio context initialized');
-        console.log('Current track:', audioctx.current_track);
-        console.log('Current chunk:', audioctx.current_chunk);
-        console.log('Max chunks:', audioctx.max_chunks);
-
-        return;
+        const response = $.get('/play', audioctx, function (data) {
+          audioctx.current_track = data.current_track;
+          audioctx.current_chunk = data.current_chunk;
+          audioctx.max_chunks = data.max_chunks;
+          playAudio();
+        });
       }
 
-      async function playAudio() {
-        var accBufferTime = 0;
+      function scheduleNextChunk(chunkBuffer) {
+        const [audioBuffer, chunk_number] = chunkBuffer;
+        if (!audioBuffer) {
+          // No more chunks to load
+          return;
+        }
+        const source = audioContext.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(audioContext.destination);
+        source.start(startLoadTime + accBufferTime);
+        sources[chunk_number] = source;
+        accBufferTime += audioBuffer.duration;
+        loadChunk(chunk_number + 1).then(scheduleNextChunk);
+      }
+
+
+      function playAudio() {
         if (audioctx.current_track === -1) {
-          await initAudioContext();
-          console.log('Audio context initialized');
-          console.log(JSON.stringify(audioctx));
+          initAudioContext();
+          return;
         }
 
-        for (var i = 0; i < audioctx.max_chunks; i++) {
-          const audioBuffer = await loadChunk(i);
-          const source = audioContext.createBufferSource();
-          source.buffer = audioBuffer;
-          source.connect(audioContext.destination);
-          source.start(accBufferTime);
-          accBufferTime += audioBuffer.duration;
-          sources[i] = source;
-        }
+        loadChunk(0).then(scheduleNextChunk);
 
         setTimeout(function () {
           clearAudioContext();
