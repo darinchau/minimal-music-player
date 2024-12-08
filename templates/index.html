@@ -172,7 +172,9 @@
 
     // Update Metadata
     function updateMetadata() {
-      $.getJSON('/metadata', audioctx, function (data) {
+      $.getJSON('/metadata', {
+        current_track: audioctx.current_track,
+      }, function (data) {
         if (data.html) {
           $('#metadata').html(`${data.html}`);
         } else {
