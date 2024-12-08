@@ -62,13 +62,13 @@ def get_metadata_content(title, url_id):
 def get_value(key, default: int | None = None):
     value = request.args.get(key)
     if not value:
-        if not default:
+        if default is None:
             raise BadRequest(f'Missing {key}')
         return default
     try:
         return int(value)
     except ValueError:
-        if not default:
+        if default is None:
             raise BadRequest(f'Invalid {key}: {value}')
         return default
 
