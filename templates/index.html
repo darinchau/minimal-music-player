@@ -13,6 +13,7 @@
       const audioContext = new (window.AudioContext || window.webkitAudioContext)();
       const source = audioContext.createBufferSource();
       let queue = [];
+      let buffers = [];
 
       async function fetchAudio() {
         // if current track is not defined, use /get to update the audio context first
@@ -34,20 +35,31 @@
             if (queue.length === 1) {
               playAudio();
             }
+            else {
+              // Add up all the durations of the audio buffers in the queue
+              // and subtract the amount of audio that has already been played
+              const total_duration = queue.reduce((acc, buffer) => acc + buffer.duration, 0);
+              const played_duration = audioContext.currentTime - audioContext.baseLatency;
+              const schedule_playback_seconds = total_duration - played_duration;
+              playAudio(schedule_playback_seconds);
+            }
           }, (e) => {
             console.log("Error decoding audio data", e);
           });
         }
       }
 
-      function playAudio() {
+      function playAudio(schedule_playback_seconds = 0) {
         if (queue.length > 0) {
           const buffer = queue.shift();
           const bufferSource = audioContext.createBufferSource();
           bufferSource.buffer = buffer;
           bufferSource.connect(audioContext.destination);
-          bufferSource.start();
-          bufferSource.onended = playAudio;
+          bufferSource.start(schedule_playback_seconds);
+          buffers.push(bufferSource);
+          bufferSource.onended = () => {
+            buffers.shift();
+          }
         }
       }
 
