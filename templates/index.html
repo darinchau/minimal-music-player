@@ -35,14 +35,6 @@
             if (queue.length === 1) {
               playAudio();
             }
-            else {
-              // Add up all the durations of the audio buffers in the queue
-              // and subtract the amount of audio that has already been played
-              const total_duration = queue.reduce((acc, buffer) => acc + buffer.duration, 0);
-              const played_duration = audioContext.currentTime - audioContext.baseLatency;
-              const schedule_playback_seconds = total_duration - played_duration;
-              playAudio(schedule_playback_seconds);
-            }
           }, (e) => {
             console.log("Error decoding audio data", e);
           });
@@ -59,6 +51,9 @@
           buffers.push(bufferSource);
           bufferSource.onended = () => {
             buffers.shift();
+            // Schedule another playback right after all the buffers
+            const total_duration = queue.reduce((acc, buffer) => acc + buffer.duration, 0);
+            playAudio(total_duration);
           }
         }
       }
