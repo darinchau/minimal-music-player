@@ -17,13 +17,11 @@
       if (audioctx.current_track >= 0) {
         return;
       }
-      fetch('/get?current_track=' + audioctx.current_track)
-        .then(response => response.json())
-        .then(data => {
-          audioctx.current_track = data.current_track;
-          audioctx.current_chunk = 0;
-          audioctx.max_chunks = data.max_chunks;
-        });
+      $.get('/get', audioctx, function (data) {
+        audioctx.current_track = data.current_track;
+        audioctx.current_chunk = 0;
+        audioctx.max_chunks = data.max_chunks;
+      });
     }
 
     async function loadChunk(chunk_number) {
