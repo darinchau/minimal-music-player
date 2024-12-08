@@ -5,13 +5,24 @@
   <meta charset="UTF-8">
   <title>Stream and Play Audio</title>
   <script>
+    var audioctx = {
+      current_track: -1,
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
       const audioContext = new (window.AudioContext || window.webkitAudioContext)();
       const source = audioContext.createBufferSource();
       let queue = [];
 
       async function fetchAudio() {
-        const response = await fetch('/play');
+        // if current track is not defined, use /get to update the audio context first
+        if (audioctx.current_track === -1) {
+          const response = await fetch('/get');
+          const data = await response.json();
+          audioctx.current_track = data.current_track;
+        }
+
+        const response = await fetch('/play?current_track=' + audioctx.current_track);
         const reader = response.body.getReader();
 
         while (true) {
