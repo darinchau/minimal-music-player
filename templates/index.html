@@ -48,17 +48,6 @@
     var buffers = {};
     var sources = {};
 
-    function initAudioContext() {
-      if (audioctx.current_track >= 0) {
-        return;
-      }
-      $.get('/get', audioctx, function (data) {
-        audioctx.current_track = data.current_track;
-        audioctx.current_chunk = 0;
-        audioctx.max_chunks = data.max_chunks;
-      });
-    }
-
     async function loadChunk(chunk_number) {
       if (buffers[chunk_number]) {
         return buffers[chunk_number];
@@ -81,12 +70,25 @@
       const audioContext = new (window.AudioContext || window.webkitAudioContext)();
       console.log('Audio context created');
 
+      function initAudioContext() {
+        if (audioctx.current_track >= 0) {
+          return;
+        }
+        $.get('/get', audioctx, function (data) {
+          audioctx.current_track = data.current_track;
+          audioctx.current_chunk = 0;
+          audioctx.max_chunks = data.max_chunks;
+          console.log('Audio context initialized');
+          console.log(JSON.stringify(audioctx));
+          playAudio();
+        });
+      }
+
       function playAudio() {
         var accBufferTime = 0;
         if (audioctx.current_track === -1) {
           initAudioContext();
-          console.log('Audio context initialized');
-          console.log(JSON.stringify(audioctx));
+          return;
         }
 
         for (var i = 0; i < audioctx.max_chunks; i++) {
