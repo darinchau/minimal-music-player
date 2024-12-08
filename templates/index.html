@@ -3,7 +3,42 @@
 
 <head>
   <meta charset="UTF-8">
-  <title>Stream and Play Audio</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Minimal Music Player</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin-top: 50px;
+      /* Default light theme */
+      background-color: #fff;
+      color: #000;
+    }
+
+    audio {
+      width: 100%;
+      max-width: 600px;
+    }
+
+    #metadata,
+    #skip-button {
+      margin-top: 20px;
+    }
+
+    /* Dark theme styles */
+    @media (prefers-color-scheme: dark) {
+      body {
+        background-color: #333;
+        color: #fff;
+      }
+
+      a {
+        color: #4a90e2;
+        /* A lighter blue for better visibility on dark backgrounds */
+      }
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.js"></script>
   <script>
     var audioctx = {
       current_track: -1,
@@ -68,7 +103,7 @@
         setTimeout(function () {
           clearAudioContext();
           playAudio();
-        }, accBufferTime * 1000 + 1000);
+        }, accBufferTime * 1000 + 1000); // Add 1 second delay to prevent unhinged infinite looping due to my buggy code
       }
 
       playAudio();
