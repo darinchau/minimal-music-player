@@ -18,7 +18,7 @@ from sqlalchemy.sql.expression import func
 import dotenv
 dotenv.load_dotenv()
 
-CHUNK_SIZE = 131072 # 128KB
+CHUNK_SIZE = 32768 # 32KB
 
 #### Setup db ####
 db = SQLAlchemy()
@@ -82,21 +82,21 @@ def get():
     """
     Get a random song from the database
     """
-    current_track = get_value('current_track', -1)
+    prev_song = get_value('prev_song', -1)
+    print("Previous song:", prev_song)
 
     # Get a random song that is not the current song and is active
-    song = db.session.query(AudioFile).filter_by(active=True).filter(AudioFile.id != current_track).order_by(func.random()).first()
+    song = db.session.query(AudioFile).filter_by(active=True).filter(AudioFile.id != prev_song).order_by(func.random()).first()
 
     if not song:
         return jsonify({'error': 'No songs found'}), 404
 
     song_file = os.path.join(app.config['UPLOAD_FOLDER'], song.filename)
     if not os.path.exists(song_file):
-        return jsonify({'error': 'Song file not found'}), 404
+        # TODO handle more gracefully
+        return jsonify({'error': f'Song file not found: {song.filename}'}), 404
 
-    # Return the song
     max_available_chunks = os.path.getsize(song_file) // CHUNK_SIZE
-
     return jsonify({'current_track': song.id, "max_chunks": max_available_chunks})
 
 @app.route('/play', methods=['GET'])

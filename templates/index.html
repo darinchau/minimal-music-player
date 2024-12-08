@@ -42,27 +42,28 @@
   <script>
     let audioctx = {
       current_track: -1,
-      current_chunk: -1,
+      current_chunk: -1, // Used for pausing. Denotes the chunk that most recently finished
       max_chunks: -1,
+      prev_song: -1,
     }
     let audioContext;
     let buffers = {}; // A cache for the audio buffers for the current song
     let sources = {}; // The audio sources for the current song
     let dirty = false; // True if events such as skip song have been triggered
     let nextSongScheduleID = null; // The ID of the timeout to schedule the next song
+    let playing = false; // True if the song is currently playing
+    let cleanupFunc = null; // Function to cleanup the current state
 
-
-    function initAudioContext(baseTime) {
-      if (audioctx.current_track >= 0) {
-        return;
+    async function initAudioContext() {
+      console.log('Initializing audio context with', JSON.stringify(audioctx));
+      try {
+        const response = await $.get('/get', audioctx);
+        audioctx.current_track = response.current_track;
+        audioctx.max_chunks = response.max_chunks;
+        audioctx.current_chunk = -1;
+      } catch (error) {
+        console.error('Error fetching audio context data:', error);
       }
-
-      const response = $.get('/get', audioctx, function (data) {
-        audioctx.current_track = data.current_track;
-        audioctx.current_chunk = data.current_chunk;
-        audioctx.max_chunks = data.max_chunks;
-        playAudio(baseTime);
-      });
     }
 
     async function loadChunk(chunk_number, accBufferTime, chunk0LoadTime, baseTime) {
@@ -85,10 +86,8 @@
     function scheduleNextChunk(chunkBuffer) {
       // If the song has been skipped, we need to clear all sources and buffers
       if (dirty) {
-        dirty = false;
-        sources = {};
-        buffers = {};
-        playAudio(audioContext.currentTime + 1);
+        cleanupFunc();
+        cleanupFunc = null;
         return;
       }
 
@@ -97,8 +96,11 @@
         let loadNextSongTime = accBufferTime - audioContext.currentTime + baseTime + chunk0LoadTime;
         console.log('No more chunks to play');
         console.log('Scheduling to load next song after ', loadNextSongTime);
-        console.log('Current time', audioContext.currentTime, 'baseTime', baseTime, 'chunk0LoadTime', chunk0LoadTime, 'accBufferTime', accBufferTime);
         nextSongScheduleID = setTimeout(function () {
+          audioctx.prev_song = audioctx.current_track;
+          audioctx.current_track = -1;
+          audioctx.current_chunk = -1;
+          audioctx.max_chunks = -1;
           console.log('Loading next song');
           console.log(JSON.stringify(audioctx));
           playAudio(audioContext.currentTime + 1);
@@ -115,17 +117,17 @@
       // Otherwise if basetime is in the past, then we are scheduling chunk 0 to play now
       if (chunk0LoadTime === -1) {
         console.log('Scheduling chunk', chunk_number, 'to play at', accBufferTime + chunk0LoadTime + baseTime);
-        console.log('accBufferTime', accBufferTime, 'chunk0LoadTime', chunk0LoadTime, 'baseTime', baseTime);
         chunk0LoadTime = Math.max(audioContext.currentTime - baseTime, 0);
         source.start(baseTime);
+        updateMetadata();
       }
       else {
         console.log('Scheduling chunk', chunk_number, 'to play at', accBufferTime + chunk0LoadTime + baseTime);
-        console.log('accBufferTime', accBufferTime, 'chunk0LoadTime', chunk0LoadTime, 'baseTime', baseTime);
         source.start(accBufferTime + chunk0LoadTime + baseTime);
       }
       sources[chunk_number] = source;
       source.onended = function () {
+        audioctx.current_chunk = chunk_number;
         source.disconnect();
         delete sources[chunk_number];
         updateMetadata();
@@ -140,20 +142,32 @@
     // BaseTime in seconds is the time when the first chunk should be played
     // Relative to the creation of the audio context
     // If baseTime is in the past, then the first chunk should be played immediately
-    function playAudio(baseTime) {
-      if (audioctx.current_track === -1 || audioctx.current_chunk === -1 || audioctx.max_chunks === -1) {
-        initAudioContext(baseTime);
+    function playAudio(baseTime, startChunk = 0) {
+      if (audioctx.max_chunks >= 0 && startChunk >= audioctx.max_chunks) {
+        console.log('startChunk is greater than max_chunks', startChunk, audioctx.max_chunks);
         return;
       }
 
+      if (audioctx.current_track === -1 || audioctx.max_chunks === -1) {
+        initAudioContext(baseTime).then(function () {
+          console.log('Initialized audio context', JSON.stringify(audioctx));
+          playAudio(baseTime);
+        });
+        return;
+      }
+
+      if (!playing) {
+        playing = true;
+        $('#play-button').text('Pause song');
+      }
+
       console.log('Playing audio with baseTime', baseTime);
-      loadChunk(0, 0, -1, baseTime).then(scheduleNextChunk);
+      loadChunk(startChunk, 0, -1, baseTime).then(scheduleNextChunk);
     }
 
     document.addEventListener('DOMContentLoaded', function () {
       audioContext = new (window.AudioContext || window.webkitAudioContext)();
       console.log('Audio context created');
-      playAudio(0);
     });
 
     // Update Metadata
@@ -172,16 +186,34 @@
     // Skip Button
     function skipTrack() {
       // Clear all scheduled sources
-      for (let key in sources) {
-        sources[key].stop();
-        sources[key].disconnect();
-      }
-      if (nextSongScheduleID) {
-        clearTimeout(nextSongScheduleID);
-        // If the scheduling is in place, we need to clear stuff instead of relying on the next song to clean up
-        sources = {};
+      cleanupFunc = function () {
+        audioctx.prev_song = audioctx.current_track;
+        audioctx.current_track = -1;
+        audioctx.current_chunk = -1;
+        audioctx.max_chunks = -1;
+        for (let key in sources) {
+          sources[key].onended = null;
+          sources[key].stop();
+          sources[key].disconnect();
+        }
         buffers = {};
+        sources = {};
+        dirty = false;
+        playing = false;
+        if (nextSongScheduleID) {
+          clearTimeout(nextSongScheduleID);
+          nextSongScheduleID = null;
+        }
+
+        // Play audio after cleanup
         playAudio(audioContext.currentTime + 1);
+      }
+
+      if (nextSongScheduleID || !playing) {
+        // That means recursion stuff is not in progress
+        // We have to rely on ourselves to schedule the next song
+        cleanupFunc();
+        cleanupFunc = null;
       }
       else {
         // If the next song is still loading, to avoid race condition,
@@ -196,6 +228,39 @@
         console.log('Skipping song');
         skipTrack();
       });
+
+      $('#play-button').click(function () {
+        if (!playing) {
+          console.log('Playing song');
+          playAudio(audioContext.currentTime, audioctx.current_chunk + 1);
+          $('#play-button').text('Pause song');
+          playing = true;
+        } else {
+          console.log('Pausing song');
+          // Suspend all scheduled sources
+          cleanupFunc = () => {
+            for (let key in sources) {
+              sources[key].onended = null;
+              sources[key].stop();
+              sources[key].disconnect();
+            }
+            sources = {};
+            dirty = false;
+            playing = false;
+            $('#play-button').text('Play song');
+          }
+          if (nextSongScheduleID) {
+            clearTimeout(nextSongScheduleID);
+            nextSongScheduleID = null;
+            cleanupFunc();
+            cleanupFunc = null;
+            playing = false;
+          }
+          else {
+            dirty = true;
+          }
+        }
+      });
     });
   </script>
 </head>
@@ -204,6 +269,7 @@
   <h1>Grace's Study Playlist</h1>
   <div id="metadata">Loading track information...</div>
   <button id="skip-button">Skip song</button>
+  <button id="play-button">Play song</button>
 </body>
 
 </html>
