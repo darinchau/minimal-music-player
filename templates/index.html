@@ -80,7 +80,7 @@
           return;
         }
 
-        const response = $.get('/play', audioctx, function (data) {
+        const response = $.get('/get', audioctx, function (data) {
           audioctx.current_track = data.current_track;
           audioctx.current_chunk = data.current_chunk;
           audioctx.max_chunks = data.max_chunks;
@@ -105,7 +105,7 @@
 
 
       function playAudio() {
-        if (audioctx.current_track === -1) {
+        if (audioctx.current_track === -1 || audioctx.current_chunk === -1 || audioctx.max_chunks === -1) {
           initAudioContext();
           return;
         }
