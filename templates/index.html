@@ -3,125 +3,36 @@
 
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Minimal Music Player</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      text-align: center;
-      margin-top: 50px;
-      background-color: #fff;
-      color: #000;
-    }
-
-    audio {
-      width: 100%;
-      max-width: 600px;
-    }
-
-    #metadata,
-    #skip-button {
-      margin-top: 20px;
-    }
-
-    @media (prefers-color-scheme: dark) {
-      body {
-        background-color: #333;
-        color: #fff;
-      }
-
-      a {
-        color: #4a90e2;
-      }
-    }
-  </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.js"></script>
-  <script>
-    let audioctx = {
-      current_track: -1,
-      current_chunk: -1,
-    }
-    var context = new (window.AudioContext || window.webkitAudioContext)();
-    var source_queues = [];
-
-    function init() {
-      loadSongWebAudioAPI();
-    }
-
-    function loadSongWebAudioAPI() {
-      if (audioctx.current_track === -1) {
-        $.get('/get', audioctx, function (data) {
-          audioctx.current_track = data.current_track;
-          audioctx.current_chunk = 0;
-          fetchMetadata();
-          loadSongWebAudioAPI();
-        });
-        return;
-      }
-
-      var request = new XMLHttpRequest();
-      request.open('GET', `/play?current_track=${audioctx.current_track}&current_chunk=${audioctx.current_chunk}`, true);
-      request.responseType = 'arraybuffer';
-
-      request.onload = function () {
-        context.decodeAudioData(request.response, function (decodedData) {
-          var source = context.createBufferSource();
-          source.buffer = decodedData;
-          source.onended = function () {
-            source_queues.shift();
-          };
-          if (source_queues.length == 0) {
-            source.connect(context.destination);
-            source.start();
-            audioctx.current_chunk++;
-            loadSongWebAudioAPI(); // Make an extra call to give some room for buffer
-          } else {
-            // Sum all the durations of the previous sources
-            let total_duration = 0;
-            for (let i = 0; i < source_queues.length; i++) {
-              total_duration += source_queues[i].buffer.duration;
-            }
-            setTimeout(() => {
-              source.connect(context.destination);
-              source.start();
-            }, (total_duration - context.currentTime) * 1000);
-            console.log(source_queues[source_queues.length - 1].buffer.duration - context.currentTime, "delayed start");
-          }
-          console.log(source.buffer.duration, "loaded");
-          source_queues.push(source);
-          audioctx.current_chunk++;
-          setTimeout(loadSongWebAudioAPI, source.buffer.duration * 1000);
-          return;
-        });
-      }
-
-      request.send();
-    }
-
-    window.addEventListener('load', init, false);
-
-    $('#skip-button').click(function () {
-      audioctx.current_track = -1;
-      audioctx.current_chunk = -1;
-      if (source) {
-        source.stop();
-        source = null;
-      }
-      loadSongWebAudioAPI();
-    });
-
-    function fetchMetadata() {
-      $.get('/metadata', audioctx, function (data) {
-        $('#metadata').html(data);
-      });
-    }
-  </script>
+  <title>Audio Stream Example</title>
 </head>
 
 <body>
-  <h1>Minimal Music Player</h1>
-  <div id="metadata">Loading track information...</div>
-  <button id="skip-button">Skip song</button>
+  <h1>Audio Stream Example</h1>
+  <button id="playButton">Play Stream</button>
+
+  <script type="module">
+    document.getElementById('playButton').addEventListener('click', async () => {
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      await audioContext.audioWorklet.addModule('audio.js')
+      const audioNode = new AudioWorkletNode(audioContext, 'audio-processor');
+      audioNode.connect(audioContext.destination);
+
+      const response = await fetch('/play');
+      const reader = response.body.getReader();
+
+      async function read() {
+        const { value, done } = await reader.read();
+        if (done) {
+          return;
+        }
+        const audioBuffer = await audioContext.decodeAudioData(value.buffer);
+        audioNode.port.postMessage({ audioBuffer });
+        read();
+      }
+
+      read();
+    });
+  </script>
 </body>
 
 </html>
