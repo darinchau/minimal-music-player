@@ -91,7 +91,10 @@
       function scheduleNextChunk(chunkBuffer) {
         const [audioBuffer, chunk_number] = chunkBuffer;
         if (!audioBuffer) {
-          // No more chunks to load
+          setTimeout(function () {
+            clearAudioContext();
+            playAudio();
+          }, accBufferTime * 1000 + 1000);
           return;
         }
         const source = audioContext.createBufferSource();
@@ -111,11 +114,6 @@
         }
 
         loadChunk(0).then(scheduleNextChunk);
-
-        setTimeout(function () {
-          clearAudioContext();
-          playAudio();
-        }, accBufferTime * 1000 + 1000); // Add 1 second delay to prevent unhinged infinite looping due to my buggy code
       }
 
       playAudio();
