@@ -60,8 +60,10 @@
           });
         }
 
-        clearAudioContext();
-        playAudio();
+        setTimeout(function () {
+          clearAudioContext();
+          playAudio();
+        }, accBufferTime * 1000);
       }
 
       playAudio();
