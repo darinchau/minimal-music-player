@@ -13,7 +13,7 @@
     var buffers = {};
     var sources = {};
 
-    function initAudioCtx() {
+    function initAudioContext() {
       fetch('/get?current_track=' + audioctx.current_track)
         .then(response => response.json())
         .then(data => {
@@ -34,7 +34,7 @@
       return audioBuffer;
     }
 
-    function clearAudioCtx() {
+    function clearAudioContext() {
       audioctx.current_track = -1;
       audioctx.current_chunk = -1;
       audioctx.max_chunks = -1;
@@ -60,7 +60,7 @@
           });
         }
 
-        clearAudioCtx();
+        clearAudioContext();
         playAudio();
       }
 
