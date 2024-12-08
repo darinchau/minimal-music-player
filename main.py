@@ -82,7 +82,7 @@ def get():
     """
     Get a random song from the database
     """
-    current_track = get_value('current_track')
+    current_track = get_value('current_track', -1)
 
     # Get a random song that is not the current song and is active
     song = db.session.query(AudioFile).filter_by(active=True).filter(AudioFile.id != current_track).order_by(func.random()).first()
