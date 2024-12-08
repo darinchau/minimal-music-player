@@ -57,8 +57,8 @@
     document.addEventListener('DOMContentLoaded', function () {
       const audioContext = new (window.AudioContext || window.webkitAudioContext)();
       console.log('Audio context created');
-      let accBufferTime = 0;
-      let chunk0PlayTime;
+
+      // accBufferTime is the accumulated buffer time of all the scheduled chunks
 
       function initAudioContext() {
         if (audioctx.current_track >= 0) {
@@ -73,7 +73,7 @@
         });
       }
 
-      async function loadChunk(chunk_number) {
+      async function loadChunk(chunk_number, accBufferTime, chunk0LoadTime, baseTime) {
         if (chunk_number >= audioctx.max_chunks) {
           return [null, null];
         }
@@ -85,44 +85,55 @@
         const arrayBuffer = await response.arrayBuffer();
         const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
         buffers[chunk_number] = audioBuffer;
-        return [audioBuffer, chunk_number];
+        return [audioBuffer, chunk_number, accBufferTime, chunk0LoadTime, baseTime];
       }
 
       function scheduleNextChunk(chunkBuffer) {
-        const [audioBuffer, chunk_number] = chunkBuffer;
+        let [audioBuffer, chunk_number, accBufferTime, chunk0LoadTime, baseTime] = chunkBuffer;
         if (!audioBuffer) {
           setTimeout(function () {
             clearAudioContext();
-            playAudio();
-          }, (accBufferTime - audioContext.currentTime + startLoadTime) * 1000);
+            playAudio(audioContext.currentTime + 1);
+          }, (accBufferTime - audioContext.currentTime + baseTime) * 1000);
           return;
         }
         const source = audioContext.createBufferSource();
         source.buffer = audioBuffer;
         source.connect(audioContext.destination);
-        if (chunk_number === 0) {
-          chunk0PlayTime = audioContext.currentTime;
-          source.start(accBufferTime);
+
+        // Schedule the audio slightly differnetly if the chunk is the first chunk
+        // If baseTime > now, then we are scheduling chunk 0 to play in the future
+        // Then chunk0LoadTime should be baseTime + 0
+        // Otherwise if basetime is in the past, then we are scheduling chunk 0 to play now
+        if (chunk0LoadTime === -1) {
+          chunk0LoadTime = max(audioContext.currentTime - baseTime, 0);
+          source.start(baseTime);
         }
         else {
-          source.start(accBufferTime + chunk0PlayTime);
+          source.start(accBufferTime + chunk0LoadTime + baseTime);
         }
         sources[chunk_number] = source;
-        accBufferTime += audioBuffer.duration;
         source.onended = function () {
           source.disconnect();
           delete sources[chunk_number];
         };
-        loadChunk(chunk_number + 1).then(scheduleNextChunk);
+        loadChunk(
+          chunk_number + 1,
+          accBufferTime + audioBuffer.duration,
+          chunk0LoadTime,
+          baseTime).then(scheduleNextChunk);
       }
 
-      function playAudio() {
+      // BaseTime in seconds is the time when the first chunk should be played
+      // Relative to the creation of the audio context
+      // If baseTime is in the past, then the first chunk should be played immediately
+      function playAudio(baseTime) {
         if (audioctx.current_track === -1 || audioctx.current_chunk === -1 || audioctx.max_chunks === -1) {
           initAudioContext();
           return;
         }
 
-        loadChunk(0).then(scheduleNextChunk);
+        loadChunk(0, 0, -1, baseTime).then(scheduleNextChunk);
       }
 
       playAudio();
