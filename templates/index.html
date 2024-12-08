@@ -14,6 +14,9 @@
     var sources = {};
 
     function initAudioContext() {
+      if (audioctx.current_track !== -1) {
+        return;
+      }
       fetch('/get?current_track=' + audioctx.current_track)
         .then(response => response.json())
         .then(data => {
@@ -45,7 +48,7 @@
 
       function playAudio() {
         var accBufferTime = 0;
-        if (audioctx.current_chunk == -1) {
+        if (audioctx.current_chunk === -1) {
           initAudioContext();
         }
 
