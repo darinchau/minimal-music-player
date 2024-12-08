@@ -103,8 +103,10 @@ def play():
     current_track = get_value('current_track')
     current_chunk = get_value('current_chunk', 0)
 
+    print(f'Recieved {current_track} at chunk {current_chunk}')
+
     if current_chunk < 0:
-        return jsonify({'error': f'Invalid chunk: {current_chunk}'}), 400
+        return jsonify({'error': f'Invalid chunk: {current_chunk}'}), 404
 
     # Get the song
     song = db.session.query(AudioFile).filter_by(id=current_track).first()
