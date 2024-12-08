@@ -48,21 +48,6 @@
     var buffers = {};
     var sources = {};
 
-    async function loadChunk(chunk_number) {
-      if (chunk_number >= audioctx.max_chunks) {
-        return [null, null];
-      }
-      if (buffers[chunk_number]) {
-        return [buffers[chunk_number], chunk_number];
-      }
-
-      const response = await fetch('/play?current_track=' + audioctx.current_track + '&current_chunk=' + chunk_number);
-      const arrayBuffer = await response.arrayBuffer();
-      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-      buffers[chunk_number] = audioBuffer;
-      return [audioBuffer, chunk_number];
-    }
-
     function clearAudioContext() {
       audioctx.current_track = -1;
       audioctx.current_chunk = -1;
@@ -86,6 +71,21 @@
           audioctx.max_chunks = data.max_chunks;
           playAudio();
         });
+      }
+
+      async function loadChunk(chunk_number) {
+        if (chunk_number >= audioctx.max_chunks) {
+          return [null, null];
+        }
+        if (buffers[chunk_number]) {
+          return [buffers[chunk_number], chunk_number];
+        }
+
+        const response = await fetch('/play?current_track=' + audioctx.current_track + '&current_chunk=' + chunk_number);
+        const arrayBuffer = await response.arrayBuffer();
+        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+        buffers[chunk_number] = audioBuffer;
+        return [audioBuffer, chunk_number];
       }
 
       function scheduleNextChunk(chunkBuffer) {
