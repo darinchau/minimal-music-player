@@ -110,6 +110,8 @@
           source.start(baseTime);
         }
         else {
+          console.log('Scheduling chunk', chunk_number, 'to play at', accBufferTime + chunk0LoadTime + baseTime);
+          console.log('accBufferTime', accBufferTime, 'chunk0LoadTime', chunk0LoadTime, 'baseTime', baseTime);
           source.start(accBufferTime + chunk0LoadTime + baseTime);
         }
         sources[chunk_number] = source;
