@@ -132,11 +132,27 @@
         delete sources[chunk_number];
         updateMetadata();
       };
-      loadChunk(
-        chunk_number + 1,
-        accBufferTime + audioBuffer.duration,
-        chunk0LoadTime,
-        baseTime).then(scheduleNextChunk);
+
+      // Either load the next chunk immediately
+      // Or if we already loaded a lot, wait a while
+      let loadedAheadTime = accBufferTime + audioBuffer.duration + baseTime + chunk0LoadTime - audioContext.currentTime;
+      console.log('Loaded ahead time', loadedAheadTime);
+      let loadNext = function () {
+        loadChunk(
+          chunk_number + 1,
+          accBufferTime + audioBuffer.duration,
+          chunk0LoadTime,
+          baseTime).then(scheduleNextChunk);
+      }
+      if (loadedAheadTime > 30) {
+        nextSongScheduleID = setTimeout(function () {
+          nextSongScheduleID = null;
+          loadNext();
+        }, 1000 * 20);
+      }
+      else {
+        loadNext();
+      }
     }
 
     // BaseTime in seconds is the time when the first chunk should be played
@@ -164,11 +180,6 @@
       console.log('Playing audio with baseTime', baseTime);
       loadChunk(startChunk, 0, -1, baseTime).then(scheduleNextChunk);
     }
-
-    document.addEventListener('DOMContentLoaded', function () {
-      audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      console.log('Audio context created');
-    });
 
     // Update Metadata
     function updateMetadata() {
@@ -224,6 +235,11 @@
         dirty = true;
       }
     }
+
+    document.addEventListener('DOMContentLoaded', function () {
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      console.log('Audio context created');
+    });
 
     $(document).ready(function () {
       $('#skip-button').click(function () {
