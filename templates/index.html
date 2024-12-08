@@ -58,7 +58,7 @@
       const audioContext = new (window.AudioContext || window.webkitAudioContext)();
       console.log('Audio context created');
       let accBufferTime = 0;
-      const startLoadTime = audioContext.currentTime;
+      let chunk0PlayTime;
 
       function initAudioContext() {
         if (audioctx.current_track >= 0) {
@@ -100,12 +100,21 @@
         const source = audioContext.createBufferSource();
         source.buffer = audioBuffer;
         source.connect(audioContext.destination);
-        source.start(accBufferTime);
+        if (chunk_number === 0) {
+          chunk0PlayTime = audioContext.currentTime;
+          source.start(accBufferTime);
+        }
+        else {
+          source.start(accBufferTime + chunk0PlayTime);
+        }
         sources[chunk_number] = source;
         accBufferTime += audioBuffer.duration;
+        source.onended = function () {
+          source.disconnect();
+          delete sources[chunk_number];
+        };
         loadChunk(chunk_number + 1).then(scheduleNextChunk);
       }
-
 
       function playAudio() {
         if (audioctx.current_track === -1 || audioctx.current_chunk === -1 || audioctx.max_chunks === -1) {
