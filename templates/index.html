@@ -14,6 +14,7 @@
       const source = audioContext.createBufferSource();
       let queue = [];
       let buffers = [];
+      let firstLoad = true;
 
       async function fetchAudio() {
         // if current track is not defined, use /get to update the audio context first
@@ -32,7 +33,8 @@
 
           audioContext.decodeAudioData(value.buffer, (buffer) => {
             queue.push(buffer);
-            if (queue.length === 1) {
+            if (firstLoad) {
+              firstLoad = false;
               playAudio();
             }
           }, (e) => {
