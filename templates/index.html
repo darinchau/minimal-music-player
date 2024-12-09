@@ -59,7 +59,7 @@
     // Get the time as a float number in seconds
     // as long as this is monotonically increasing is ok
     function getAbsoluteTime() {
-      return new Date().getTime() / 1000;
+      return performance.now() / 1000;
     }
 
     function getTime() {
