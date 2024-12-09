@@ -19,6 +19,7 @@ import dotenv
 dotenv.load_dotenv()
 
 CHUNK_SIZE = 131072
+OVERLAP_SIZE = 1024
 
 #### Setup db ####
 db = SQLAlchemy()
@@ -96,7 +97,7 @@ def get():
         # TODO handle more gracefully
         return jsonify({'error': f'Song file not found: {song.filename}'}), 404
 
-    max_available_chunks = os.path.getsize(song_file) // CHUNK_SIZE
+    max_available_chunks = os.path.getsize(song_file) // (CHUNK_SIZE - OVERLAP_SIZE)
     return jsonify({'current_track': song.id, "max_chunks": max_available_chunks})
 
 @app.route('/play', methods=['GET'])
@@ -126,12 +127,12 @@ def play():
         return jsonify({'error': 'Song file not found'}), 404
 
     # Return the song
-    max_available_chunks = os.path.getsize(song_file) // CHUNK_SIZE
+    max_available_chunks = os.path.getsize(song_file) // (CHUNK_SIZE - OVERLAP_SIZE)
     if current_chunk >= max_available_chunks:
         return jsonify({'error': 'End of song'}), 404
 
     with open(song_file, 'rb') as f:
-        f.seek(current_chunk * CHUNK_SIZE)
+        f.seek(current_chunk * (CHUNK_SIZE - OVERLAP_SIZE))
         data = f.read(CHUNK_SIZE)
     return Response(data, mimetype=AudioFile.ACCEPTED_FORMATS[song.format])
 
