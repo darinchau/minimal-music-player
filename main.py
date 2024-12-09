@@ -152,16 +152,11 @@ def upload_file():
         file = request.files[f'chunk_{i}']
         if not file or file.filename is None:
             return jsonify({"error": f"Invalid file for chunk {i}"}), 400
-        # show the filesize
-        file.stream.seek(0, 2)
-        file_size = file.stream.tell()
-        print(f"File size {file.filename}: {file_size}")
-        file.stream.seek(0)
 
     # Save each file
     for i in range(chunks):
         chunk_name = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(f"{url_id}{i}.mp3"))
-        file.save(chunk_name)
+        request.files[f'chunk_{i}'].save(chunk_name)
 
     entry = {
         "title": title,
