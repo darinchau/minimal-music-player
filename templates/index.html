@@ -107,6 +107,13 @@
           audioctx.current_track = -1;
           audioctx.current_chunk = -1;
           audioctx.max_chunks = -1;
+          for (let key in sources) {
+            sources[key].onended = null;
+            sources[key].stop();
+            sources[key].disconnect();
+          }
+          buffers = {};
+          sources = {};
           console.log('Loading next song');
           console.log(JSON.stringify(audioctx));
           playAudio(audioContext.currentTime + 1);
