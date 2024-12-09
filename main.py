@@ -91,7 +91,7 @@ def get():
     for song in songs:
         missing_chunks = []
         for i in range(song.chunks):
-            path =
+            path = get_path(song.url_id, i)
             if not os.path.exists(path):
                 missing_chunks.append(i)
             if os.path.getsize(path) == 0:
