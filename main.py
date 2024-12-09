@@ -182,7 +182,7 @@ def upload_file():
 
 
 @app.route('/remove', methods=['DELETE'])
-def remove_old():
+def remove_file():
     secret = request.form['secret']
     if secret != app.secret_key:
         return jsonify({"error": "Invalid secret"}), 400
