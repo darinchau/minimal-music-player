@@ -152,6 +152,11 @@ def upload_file():
         file = request.files[f'chunk_{i}']
         if not file or file.filename is None:
             return jsonify({"error": f"Invalid file for chunk {i}"}), 400
+        # show the filesize
+        try:
+            print(f"File size {file.filename}: {file.stream.getbuffer().nbytes}")
+        except Exception as e:
+            print(f"Error getting file size: {e}")
 
     # Save each file
     for i in range(chunks):
