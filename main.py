@@ -18,7 +18,7 @@ from sqlalchemy.sql.expression import func
 import dotenv
 dotenv.load_dotenv()
 
-CHUNK_SIZE = 65536 # 64KB
+CHUNK_SIZE = 131072
 
 #### Setup db ####
 db = SQLAlchemy()

@@ -53,7 +53,6 @@
     let nextSongScheduleID = null; // The ID of the timeout to schedule the next song
     let playing = false; // True if the song is currently playing
     let cleanupFunc = null; // Function to cleanup the current state
-    const baseLatency = 0.01 // There is sometimes some latency in starting the audio, use this to offset the start time
 
     async function initAudioContext() {
       console.log('Initializing audio context with', JSON.stringify(audioctx));
@@ -119,12 +118,12 @@
       if (chunk0LoadTime === -1) {
         console.log('Scheduling chunk', chunk_number, 'to play at', baseTime);
         chunk0LoadTime = Math.max(audioContext.currentTime - baseTime, 0);
-        source.start(baseTime - baseLatency);
+        source.start(baseTime - audioContext.baseLatency);
         updateMetadata();
       }
       else {
         console.log('Scheduling chunk', chunk_number, 'to play at', accBufferTime + chunk0LoadTime + baseTime);
-        source.start(accBufferTime + chunk0LoadTime + baseTime - baseLatency);
+        source.start(accBufferTime + chunk0LoadTime + baseTime - audioContext.baseLatency);
       }
       sources[chunk_number] = source;
       source.onended = function () {
