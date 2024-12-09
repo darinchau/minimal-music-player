@@ -63,6 +63,9 @@ def get_value(key, default: int | None = None):
             raise BadRequest(f'Invalid {key}: {value}')
         return default
 
+def get_path(song_url_id: str, i: int):
+    return os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(f"{song_url_id}{i}.mp3"))
+
 # Routes
 @app.route('/')
 def index():
@@ -73,17 +76,34 @@ def get():
     """
     Get a random song from the database
     """
-    prev_song = get_value('prev_song', -1)
-    print("Previous song:", prev_song)
+    prev_song_id = get_value('prev_song', -1)
+    print("Previous song:", prev_song_id)
 
     # Get a random song that is not the current song and is active
-    song = db.session.query(AudioFile).filter_by(active=True).filter(AudioFile.id != prev_song).order_by(func.random()).first()
+    songs = db.session.query(AudioFile).filter_by(active=True).filter(AudioFile.id != prev_song_id).order_by(func.random()).all()
+    prev_song = db.session.query(AudioFile).filter_by(id=prev_song_id).first()
+    if prev_song:
+        songs.append(prev_song) # Check this song last
 
-    if not song:
+    if not songs:
         return jsonify({'error': 'No songs found'}), 404
 
-    max_available_chunks = song.chunks
-    return jsonify({'current_track': song.id, "max_chunks": max_available_chunks})
+    for song in songs:
+        missing_chunks = []
+        for i in range(song.chunks):
+            path =
+            if not os.path.exists(path):
+                missing_chunks.append(i)
+            if os.path.getsize(path) == 0:
+                missing_chunks.append(i)
+        if missing_chunks:
+            print(f"Song {song.id} is missing chunks: {missing_chunks}")
+            continue
+
+        max_available_chunks = song.chunks
+        return jsonify({'current_track': song.id, "max_chunks": max_available_chunks})
+
+    return jsonify({'error': 'No songs found - all candidates songs are unavailable'}), 404
 
 @app.route('/play', methods=['GET'])
 def play():
@@ -106,7 +126,7 @@ def play():
     if not song:
         return jsonify({'error': f'Song not found: {current_track}'}), 404
 
-    path = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(f"{song.url_id}{current_chunk}.mp3"))
+    path = get_path(song.url_id, current_chunk)
     print(f"Sending {path}")
     with open(path, 'rb') as f:
         data = f.read()
@@ -126,9 +146,42 @@ def metadata():
     return jsonify({"html": get_metadata_content(song.title, song.url_id)})
 
 @app.route('/upload', methods=['POST'])
-def upload_file():
-    url_id = request.form['url_id']
+def upload():
     secret = request.form['secret']
+    if secret != app.secret_key:
+        return jsonify({"error": "Invalid secret"}), 400
+
+    if "current_track" in request.form and "current_chunk" in request.form:
+        current_track = request.form['current_track']
+        try:
+            current_track = int(current_track)
+        except ValueError:
+            return jsonify({"error": f"Invalid current_track ({current_track})"}), 400
+
+        current_chunk = request.form['current_chunk']
+        try:
+            current_chunk = int(current_chunk)
+        except ValueError:
+            return jsonify({"error": f"Invalid current_chunk ({current_chunk})"}), 400
+
+        if current_chunk < 0:
+            return jsonify({"error": f"Invalid current_chunk ({current_chunk})"}), 400
+
+        song = db.session.query(AudioFile).filter_by(id=current_track).first()
+        if not song:
+            return jsonify({"error": f"Song not found: {current_track}"}), 404
+
+        if current_chunk >= song.chunks:
+            return jsonify({"error": f"Invalid current_chunk ({current_chunk}), max = {song.chunks}"}), 400
+
+        file = request.files['file']
+        if file is None:
+            return jsonify({"error": "No file uploaded"}), 400
+
+        file.save(get_path(song.url_id, current_chunk))
+        return jsonify({"message": "File uploaded successfully"})
+
+    url_id = request.form['url_id']
     title = request.form['title']
     chunks = request.form['chunks']
 
@@ -137,26 +190,15 @@ def upload_file():
     except ValueError:
         return jsonify({"error": f"Invalid chunk count: {chunks}"}), 400
 
-    if secret != app.secret_key:
-        return jsonify({"error": "Invalid secret"}), 400
+    if chunks < 1:
+        return jsonify({"error": f"Invalid chunk count: {chunks}"}), 400
 
     if len(url_id) != 11:
-        return jsonify({"error": "Invalid URL ID"}), 400
+        return jsonify({"error": f"Invalid URL ID: {url_id}"}), 400
 
     exist_url_id = db.session.query(AudioFile).filter_by(url_id=url_id).first()
     if exist_url_id:
         return jsonify({"error": f"URL ID {url_id} already exists"}), 400
-
-    # Check each chunk first
-    for i in range(chunks):
-        file = request.files[f'chunk_{i}']
-        if not file or file.filename is None:
-            return jsonify({"error": f"Invalid file for chunk {i}"}), 400
-
-    # Save each file
-    for i in range(chunks):
-        chunk_name = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(f"{url_id}{i}.mp3"))
-        request.files[f'chunk_{i}'].save(chunk_name)
 
     entry = {
         "title": title,
@@ -168,7 +210,7 @@ def upload_file():
     audio_file = AudioFile(**entry)
     db.session.add(audio_file)
     db.session.commit()
-    return jsonify({"message": "File uploaded successfully", "id": audio_file.id})
+    return jsonify({"message": "Entry made successfully", "id": audio_file.id})
 
 
 @app.route('/remove', methods=['DELETE'])
@@ -213,9 +255,8 @@ def list_files():
     if secret != app.secret_key:
         return jsonify({"error": "Invalid secret"}), 400
 
-    # files = os.listdir(app.config['UPLOAD_FOLDER'])
-    # os system ls -l
-    files = os.system(f"ls -l {app.config['UPLOAD_FOLDER']}")
+    os.system(f"ls -l {app.config['UPLOAD_FOLDER']}")
+    files = os.listdir(app.config['UPLOAD_FOLDER'])
     return jsonify(files)
 
 if __name__ == '__main__':
