@@ -49,7 +49,7 @@ def upload_file(url: str, file_path: str, url_id: str, title: str):
                 'chunks': len(filepaths)
             }
             audio_files = {
-                f"chunk_{i}": (f"{url_id}{i}.mp3", file, 'audio/mpeg3') for i, file in enumerate(files)
+                f"chunk_{i}": file for i, file in enumerate(files)
             }
-            response = requests.post(url, files=audio_files, data=data)
-            return response
+            response = requests.post(url, data=data, files=audio_files)
+    return response

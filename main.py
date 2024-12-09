@@ -107,9 +107,10 @@ def play():
         return jsonify({'error': f'Song not found: {current_track}'}), 404
 
     path = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(f"{song.url_id}{current_chunk}.mp3"))
+    print(f"Sending {path}")
     with open(path, 'rb') as f:
         data = f.read()
-    return Response(data, mimetype="audio/mpeg")
+    return Response(data, mimetype='audio/mpeg')
 
 @app.route('/metadata', methods=['GET'])
 def metadata():
@@ -212,7 +213,9 @@ def list_files():
     if secret != app.secret_key:
         return jsonify({"error": "Invalid secret"}), 400
 
-    files = os.listdir(app.config['UPLOAD_FOLDER'])
+    # files = os.listdir(app.config['UPLOAD_FOLDER'])
+    # os system ls -l
+    files = os.system(f"ls -l {app.config['UPLOAD_FOLDER']}")
     return jsonify(files)
 
 if __name__ == '__main__':
