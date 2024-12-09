@@ -53,6 +53,7 @@
     let nextSongScheduleID = null; // The ID of the timeout to schedule the next song
     let playing = false; // True if the song is currently playing
     let cleanupFunc = null; // Function to cleanup the current state
+    let paused = false; // If true, the audio is paused but the webpage continues to buffer the audio.
 
     async function initAudioContext() {
       console.log('Initializing audio context with', JSON.stringify(audioctx));
@@ -88,7 +89,10 @@
       if (dirty) {
         cleanupFunc();
         cleanupFunc = null;
-        return;
+        if (!paused) {
+          // This means track is skipped
+          return;
+        }
       }
 
       let [audioBuffer, chunk_number, accBufferTime, chunk0LoadTime, baseTime] = chunkBuffer;
@@ -110,32 +114,34 @@
         return;
       }
 
-      // Create a new buffer source
-      const source = audioContext.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(audioContext.destination);
+      if (!paused) {
+        // Create a new buffer source
+        const source = audioContext.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(audioContext.destination);
 
-      // Schedule the audio slightly differnetly if the chunk is the first chunk
-      // If baseTime > now, then we are scheduling chunk 0 to play in the future
-      // Then chunk0LoadTime should be baseTime + 0
-      // Otherwise if basetime is in the past, then we are scheduling chunk 0 to play now
-      if (chunk0LoadTime === -1) {
-        console.log('Scheduling chunk', chunk_number, 'to play at', baseTime);
-        chunk0LoadTime = Math.max(audioContext.currentTime - baseTime, 0);
-        source.start(baseTime - audioContext.baseLatency - audioContext.outputLatency);
-        updateMetadata();
+        // Schedule the audio slightly differnetly if the chunk is the first chunk
+        // If baseTime > now, then we are scheduling chunk 0 to play in the future
+        // Then chunk0LoadTime should be baseTime + 0
+        // Otherwise if basetime is in the past, then we are scheduling chunk 0 to play now
+        if (chunk0LoadTime === -1) {
+          console.log('Scheduling chunk', chunk_number, 'to play at', baseTime);
+          chunk0LoadTime = Math.max(audioContext.currentTime - baseTime, 0);
+          source.start(baseTime);
+          updateMetadata();
+        }
+        else {
+          console.log('Scheduling chunk', chunk_number, 'to play at', accBufferTime + chunk0LoadTime + baseTime);
+          source.start(accBufferTime + chunk0LoadTime + baseTime);
+        }
+        sources[chunk_number] = source;
+        source.onended = function () {
+          audioctx.current_chunk = chunk_number;
+          source.disconnect();
+          delete sources[chunk_number];
+          updateMetadata();
+        };
       }
-      else {
-        console.log('Scheduling chunk', chunk_number, 'to play at', accBufferTime + chunk0LoadTime + baseTime);
-        source.start(accBufferTime + chunk0LoadTime + baseTime - audioContext.baseLatency - audioContext.outputLatency);
-      }
-      sources[chunk_number] = source;
-      source.onended = function () {
-        audioctx.current_chunk = chunk_number;
-        source.disconnect();
-        delete sources[chunk_number];
-        updateMetadata();
-      };
 
       // Either load the next chunk immediately
       // Or if we already loaded a lot, wait a while
@@ -148,7 +154,7 @@
           chunk0LoadTime,
           baseTime).then(scheduleNextChunk);
       }
-      if (loadedAheadTime > 30) {
+      if (loadedAheadTime > 30 && !paused) {
         nextSongScheduleID = setTimeout(function () {
           nextSongScheduleID = null;
           loadNext();
@@ -223,6 +229,7 @@
         }
 
         // Play audio after cleanup
+        paused = false;
         playAudio(audioContext.currentTime + 1);
       }
 
@@ -237,6 +244,7 @@
         // we need to set dirty to true to avoid scheduling the next song
         // and perform the cleanup inside the schedulingNextChunk function
         dirty = true;
+        paused = false;
       }
     }
 
@@ -257,8 +265,11 @@
           playAudio(audioContext.currentTime, audioctx.current_chunk + 1);
           $('#play-button').text('Pause song');
           playing = true;
+          paused = false;
         } else {
           console.log('Pausing song');
+          paused = true;
+
           // Suspend all scheduled sources
           cleanupFunc = () => {
             for (let key in sources) {
