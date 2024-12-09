@@ -14,15 +14,9 @@ from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql.expression import func
-from pydub import AudioSegment
-import pydub
-import tempfile
 
 import dotenv
 dotenv.load_dotenv()
-
-# Chunk size of the yielded audio. Only matters during upload
-CHUNK_SIZE_SECONDS = 2
 
 #### Setup db ####
 db = SQLAlchemy()
@@ -132,12 +126,15 @@ def metadata():
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
-    file = request.files['audio']
     url_id = request.form['url_id']
     secret = request.form['secret']
     title = request.form['title']
+    chunks = request.form['chunks']
 
-    print("Using prober: ", pydub.utils.get_prober_name())
+    try:
+        chunks = int(chunks)
+    except ValueError:
+        return jsonify({"error": f"Invalid chunk count: {chunks}"}), 400
 
     if secret != app.secret_key:
         return jsonify({"error": "Invalid secret"}), 400
@@ -149,32 +146,20 @@ def upload_file():
     if exist_url_id:
         return jsonify({"error": f"URL ID {url_id} already exists"}), 400
 
-    if not file or file.filename is None:
-        return jsonify({"error": "Invalid file"}), 400
+    # Check each chunk first
+    for i in range(chunks):
+        file = request.files[f'chunk_{i}']
+        if not file or file.filename is None:
+            return jsonify({"error": f"Invalid file for chunk {i}"}), 400
 
-    def make_chunks(audio_segment, chunk_length_ms):
-        """Yield successive chunk_length_ms chunks from audio_segment."""
-        for i in range(0, len(audio_segment), chunk_length_ms):
-            aud: AudioSegment = audio_segment[i:i + chunk_length_ms] # for type checking
-            yield aud
-
-    file_ext = os.path.splitext(file.filename)[1]
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        filename = secure_filename(f"{url_id}{file_ext}")
-        filepath = os.path.join(tmpdirname, filename)
-        file.save(filepath)
-        audio: AudioSegment = AudioSegment.from_mp3(filepath)
-        max_available_chunks = int(audio.duration_seconds / CHUNK_SIZE_SECONDS)
-        chunks = make_chunks(audio, CHUNK_SIZE_SECONDS * 1000)
-
-        # Saving chunks as separate files
-        for i, chunk in enumerate(chunks):
-            chunk_name = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(f"{url_id}{i}.mp3"))
-            chunk.export(chunk_name, format="mp3")
+    # Save each file
+    for i in range(chunks):
+        chunk_name = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(f"{url_id}{i}.mp3"))
+        file.save(chunk_name)
 
     entry = {
         "title": title,
-        "chunks": max_available_chunks,
+        "chunks": chunks,
         "url_id": url_id,
         "active": True
     }
