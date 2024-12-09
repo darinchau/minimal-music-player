@@ -77,7 +77,6 @@ def get():
     Get a random song from the database
     """
     prev_song_id = get_value('prev_song', -1)
-    print("Previous song:", prev_song_id)
 
     # Get a random song that is not the current song and is active
     songs = db.session.query(AudioFile).filter_by(active=True).filter(AudioFile.id != prev_song_id).order_by(func.random()).all()
@@ -116,8 +115,6 @@ def play():
     current_track = get_value('current_track')
     current_chunk = get_value('current_chunk', 0)
 
-    print(f'Recieved {current_track} at chunk {current_chunk}')
-
     if current_chunk < 0:
         return jsonify({'error': f'Invalid chunk: {current_chunk}'}), 404
 
@@ -127,7 +124,6 @@ def play():
         return jsonify({'error': f'Song not found: {current_track}'}), 404
 
     path = get_path(song.url_id, current_chunk)
-    print(f"Sending {path}")
     with open(path, 'rb') as f:
         data = f.read()
     return Response(data, mimetype='audio/mpeg')
