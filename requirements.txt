@@ -1,4 +1,3 @@
-ffmpeg
 flask
 flask-cors
 flask-sqlalchemy
