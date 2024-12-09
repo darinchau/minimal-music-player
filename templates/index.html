@@ -54,6 +54,20 @@
     let playing = false; // True if the song is currently playing
     let cleanupFunc = null; // Function to cleanup the current state
     let paused = false; // If true, the audio is paused but the webpage continues to buffer the audio.
+    let audioCtxLoadTime;
+
+    // Get the time as a float number in seconds
+    // as long as this is monotonically increasing is ok
+    function getAbsoluteTime() {
+      return new Date().getTime() / 1000;
+    }
+
+    function getTime() {
+      if (!audioCtxLoadTime) {
+        audioCtxLoadTime = getAbsoluteTime(); // Sets the global timer to the current time
+      }
+      return getAbsoluteTime() - audioCtxLoadTime;
+    }
 
     async function initAudioContext() {
       console.log('Initializing audio context with', JSON.stringify(audioctx));
@@ -99,7 +113,7 @@
 
       // Prepare to play the next song if there are no more chunks to play
       if (!audioBuffer) {
-        let loadNextSongTime = accBufferTime - audioContext.currentTime + baseTime + chunk0LoadTime;
+        let loadNextSongTime = accBufferTime - getTime() + baseTime + chunk0LoadTime;
         console.log('No more chunks to play');
         console.log('Scheduling to load next song after ', loadNextSongTime);
         nextSongScheduleID = setTimeout(function () {
@@ -116,7 +130,7 @@
           sources = {};
           console.log('Loading next song');
           console.log(JSON.stringify(audioctx));
-          playAudio(audioContext.currentTime + 1);
+          playAudio(getTime() + 1);
         }, loadNextSongTime * 1000);
         return;
       }
@@ -133,7 +147,7 @@
         // Otherwise if basetime is in the past, then we are scheduling chunk 0 to play now
         if (chunk0LoadTime === -1) {
           console.log('Scheduling chunk', chunk_number, 'to play at', baseTime);
-          chunk0LoadTime = Math.max(audioContext.currentTime - baseTime, 0);
+          chunk0LoadTime = Math.max(getTime() - baseTime, 0);
           source.start(baseTime);
           updateMetadata();
         }
@@ -152,7 +166,7 @@
 
       // Either load the next chunk immediately
       // Or if we already loaded a lot, wait a while
-      let loadedAheadTime = accBufferTime + audioBuffer.duration + baseTime + chunk0LoadTime - audioContext.currentTime;
+      let loadedAheadTime = accBufferTime + audioBuffer.duration + baseTime + chunk0LoadTime - getTime();
       console.log('Loaded ahead time', loadedAheadTime);
       let loadNext = function () {
         loadChunk(
@@ -237,7 +251,7 @@
 
         // Play audio after cleanup
         paused = false;
-        playAudio(audioContext.currentTime + 1);
+        playAudio(getTime() + 1);
       }
 
       if (nextSongScheduleID || !playing) {
@@ -257,6 +271,7 @@
 
     document.addEventListener('DOMContentLoaded', function () {
       audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      audioCtxLoadTime = getAbsoluteTime();
       console.log('Audio context created');
     });
 
@@ -269,7 +284,7 @@
       $('#play-button').click(function () {
         if (!playing) {
           console.log('Playing song');
-          playAudio(audioContext.currentTime, audioctx.current_chunk + 1);
+          playAudio(getTime(), audioctx.current_chunk + 1);
           $('#play-button').text('Pause song');
           playing = true;
           paused = false;
