@@ -15,6 +15,7 @@ from sqlalchemy.orm import mapped_column
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql.expression import func
 from pydub import AudioSegment
+import pydub
 import tempfile
 
 import dotenv
@@ -134,6 +135,9 @@ def upload_file():
     file = request.files['audio']
     url_id = request.form['url_id']
     secret = request.form['secret']
+    title = request.form['title']
+
+    print("Using prober: ", pydub.utils.get_prober_name())
 
     if secret != app.secret_key:
         return jsonify({"error": "Invalid secret"}), 400
@@ -169,7 +173,7 @@ def upload_file():
             chunk.export(chunk_name, format="mp3")
 
     entry = {
-        "title": request.form['title'],
+        "title": title,
         "chunks": max_available_chunks,
         "url_id": url_id,
         "active": True
