@@ -101,7 +101,7 @@
       return tmp;
     }
 
-    async function loadChunk(chunk_number, accBufferTime, chunk0LoadTime, baseTime) {
+    async function loadChunk(chunk_number, accBufferTime, firstChunkLoadTime, baseTime) {
       let buffer;
       if (chunk_number >= playerContext.max_chunks) {
         buffer = null;
@@ -115,15 +115,15 @@
         buffer = await audioContext.decodeAudioData(arrayBuffer);
         buffers[chunk_number] = buffer;
       }
-      return [buffer, chunk_number, accBufferTime, chunk0LoadTime, baseTime];
+      return [buffer, chunk_number, accBufferTime, firstChunkLoadTime, baseTime];
     }
 
     // Assume the input:
-    // chunkBuffer = [audioBuffer, chunk_number, accBufferTime, chunk0LoadTime, baseTime]
+    // chunkBuffer = [audioBuffer, chunk_number, accBufferTime, firstChunkLoadTime, baseTime]
     // where audioBuffer chunk i
     // chunk_number = i
     // accBufferTime = the cumulative time of all previous i-1 buffers
-    // chunk0LoadTime = the time it takes to load the first chunk, -1 if not yet defined
+    // firstChunkLoadTime = the time it takes to load the first chunk, -1 if not yet defined
     // baseTime = the time when the first chunk should be played
     function scheduleNextChunk(chunkBuffer) {
       // If the song has been skipped, we need to clear all sources and buffers
@@ -136,11 +136,11 @@
         }
       }
 
-      let [audioBuffer, chunkNumber, accBufferTime, chunk0LoadTime, baseTime] = chunkBuffer;
+      let [audioBuffer, chunkNumber, accBufferTime, firstChunkLoadTime, baseTime] = chunkBuffer;
 
       // Prepare to play the next song if there are no more chunks to play
       if (chunkNumber >= playerContext.max_chunks) {
-        let loadNextSongTime = accBufferTime - getTime() + baseTime + chunk0LoadTime;
+        let loadNextSongTime = accBufferTime - getTime() + baseTime + firstChunkLoadTime;
         console.log('No more chunks to play');
         console.log('Scheduling to load next song after ', loadNextSongTime);
         nextSongScheduleID = setTimeout(function () {
@@ -157,25 +157,23 @@
         return;
       }
 
-      // Loads the i-1-th chunk. At this point, assume the i-1th chunk is loaded
-      if (!paused && chunkNumber !== 0) {
+      if (!paused) {
         const source = audioContext.createBufferSource();
         source.buffer = audioBuffer;
         source.connect(audioContext.destination);
 
-        // Schedule the audio slightly differnetly if the chunk is the first chunk
-        // If baseTime > now, then we are scheduling chunk 0 to play in the future
-        // Then chunk0LoadTime should be baseTime + 0
-        // Otherwise if basetime is in the past, then we are scheduling chunk 0 to play now
-        if (chunk0LoadTime === -1) {
-          console.log('Scheduling chunk', chunkNumber, 'to play at', baseTime);
-          chunk0LoadTime = Math.max(getTime() - baseTime, 0);
-          source.start(baseTime);
+        // If baseTime is in the past, add 0.5 seconds to buffer the loads to make sure
+        // scheduling is good
+        if (firstChunkLoadTime === -1) {
+          let timeNow = getTime();
+          firstChunkLoadTime = baseTime < timeNow ? timeNow + 0.5 - baseTime : 0;
+          console.log('Scheduling chunk', chunkNumber, 'to play at', baseTime + firstChunkLoadTime);
+          source.start(baseTime + firstChunkLoadTime);
           updateMetadata();
         }
         else {
-          console.log('Scheduling chunk', chunkNumber, 'to play at', accBufferTime + chunk0LoadTime + baseTime);
-          source.start(accBufferTime + chunk0LoadTime + baseTime);
+          console.log('Scheduling chunk', chunkNumber, 'to play at', accBufferTime + firstChunkLoadTime + baseTime);
+          source.start(accBufferTime + firstChunkLoadTime + baseTime);
         }
         sources[chunkNumber] = source;
         source.onended = function () {
@@ -188,13 +186,13 @@
 
       // Either load the next chunk immediately
       // Or if we already loaded a lot, wait a while
-      let loadedAheadTime = accBufferTime + audioBuffer.duration + baseTime + chunk0LoadTime - getTime();
+      let loadedAheadTime = accBufferTime + audioBuffer.duration + baseTime + firstChunkLoadTime - getTime();
       console.log('Loaded ahead time', loadedAheadTime);
       let loadNext = function () {
         loadChunk(
           chunkNumber + 1,
           accBufferTime + audioBuffer.duration,
-          chunk0LoadTime,
+          firstChunkLoadTime,
           baseTime).then(scheduleNextChunk);
       }
       if (loadedAheadTime > 30 && !paused) {
