@@ -141,11 +141,19 @@ def metadata():
 
     return jsonify({"html": get_metadata_content(song.title, song.url_id)})
 
-@app.route('/upload', methods=['POST'])
+@app.route('/upload', methods=['GET', 'POST'])
 def upload():
     secret = request.form['secret']
     if secret != app.secret_key:
         return jsonify({"error": "Invalid secret"}), 400
+
+    if request.method == 'GET':
+        url_id = request.form['url_id']
+        song = db.session.query(AudioFile).filter_by(url_id=url_id).first()
+        if not song:
+            return jsonify({"error": f"Song not found: {url_id}"}), 404
+        return jsonify({"message": "Song found", "id": song.id})
+
 
     if "current_track" in request.form and "current_chunk" in request.form:
         current_track = request.form['current_track']
@@ -254,6 +262,37 @@ def list_files():
     os.system(f"ls -l {app.config['UPLOAD_FOLDER']}")
     files = os.listdir(app.config['UPLOAD_FOLDER'])
     return jsonify(files)
+
+@app.route('/health', methods=['GET'])
+def check_song_health():
+    if not "current_track" in request.form:
+        songs = db.session.query(AudioFile).all()
+    else:
+        current_track = request.form['current_track']
+        try:
+            current_track = int(current_track)
+        except ValueError:
+            return jsonify({"error": f"Invalid current_track ({current_track})"}), 400
+
+        song = db.session.query(AudioFile).filter_by(id=current_track).first()
+        if not song:
+            return jsonify({"error": f"Song not found: {current_track}"}), 404
+        songs = [song]
+
+    message = ""
+    for song in songs:
+        missing_chunks = []
+        for i in range(song.chunks):
+            path = get_path(song.url_id, i)
+            if not os.path.exists(path):
+                missing_chunks.append(i)
+            if os.path.getsize(path) == 0:
+                missing_chunks.append(i)
+        if missing_chunks:
+            message += f"Song {song.id} is missing chunks: {missing_chunks}\n"
+            song.active = False
+    db.session.commit()
+    return jsonify({"message": f"Health check complete.\n {message.strip()}"})
 
 if __name__ == '__main__':
     app.run(debug=True, port=8123)

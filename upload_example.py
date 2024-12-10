@@ -33,6 +33,15 @@ def upload_file(url: str, file_path: str, url_id: str, title: str, *, progress_b
     - url_id (str): the URL ID of the file
     - title (str): the title of the file
     """
+    # Check if song exists
+    r = requests.get(url, data = {
+        'url_id': url_id,
+        'secret': os.getenv("SECRET_KEY"),
+    })
+    if r.ok:
+        print(f"Song {title} already exists")
+        return
+
     audio = AudioSegment.from_mp3(file_path)
     chunks = make_chunks(audio, CHUNK_SIZE_SECONDS * 1000)
     chunks = list(chunks)
