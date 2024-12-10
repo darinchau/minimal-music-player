@@ -288,8 +288,10 @@ def check_song_health():
             path = get_path(song.url_id, i)
             if not os.path.exists(path):
                 missing_chunks.append(i)
+                continue
             if os.path.getsize(path) == 0:
                 missing_chunks.append(i)
+                continue
         if missing_chunks:
             message += f"Song {song.id} is missing chunks: {missing_chunks}\n"
             song.active = False
